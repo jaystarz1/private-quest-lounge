@@ -15,6 +15,12 @@ services:
       RET_PUBLIC_VOICE_HOST: ${PUBLIC_VOICE_HOST:-lounge-voice.thechatbotgenius.com}
       DIALOG_HOSTNAME: ${PUBLIC_VOICE_HOST:-lounge-voice.thechatbotgenius.com}
       DIALOG_PORT: "443"
+      GMAIL_WEBHOOK_URL: ${LOUNGE_GMAIL_WEBHOOK_URL}
+      SMTP_SERVER: ${LOUNGE_SMTP_SERVER:-smtp.resend.com}
+      SMTP_PORT: "587"
+      SMTP_USERNAME: ${LOUNGE_SMTP_USERNAME:-resend}
+      SMTP_PASSWORD: ${LOUNGE_SMTP_PASSWORD}
+      SMTP_FROM: ${LOUNGE_SMTP_FROM:-lounge@send.hushhollow.ca}
   hubs-client:
     environment:
       PUBLIC_HOST: ${PUBLIC_HOST:-lounge.thechatbotgenius.com}

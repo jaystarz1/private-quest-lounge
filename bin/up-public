@@ -6,6 +6,16 @@ source "$basedir"/bin/lib-env
 PUBLIC_MEDIA_IP=${PUBLIC_MEDIA_IP:-$(curl -s --max-time 10 https://api.ipify.org)}
 LAN_MEDIA_IP=${LAN_MEDIA_IP:-$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1)}
 export PUBLIC_MEDIA_IP LAN_MEDIA_IP
+# Magic-link email: prefer the operator's Gmail Apps Script webhook
+if [ -z "$LOUNGE_GMAIL_WEBHOOK_URL" ]; then
+  LOUNGE_GMAIL_WEBHOOK_URL=$(python3 -c "import json;print(json.load(open('$HOME/.claude.json')).get('mcpServers',{}).get('google-workspace',{}).get('env',{}).get('GMAIL_URL',''))" 2>/dev/null)
+  export LOUNGE_GMAIL_WEBHOOK_URL
+fi
+# Fallback: Resend SMTP (key shared with Bedtime Stories)
+if [ -z "$LOUNGE_SMTP_PASSWORD" ] && [ -f "$HOME/Bedtime_Stories/.env" ]; then
+  LOUNGE_SMTP_PASSWORD=$(grep '^RESEND_API_KEY=' "$HOME/Bedtime_Stories/.env" | cut -d= -f2)
+  export LOUNGE_SMTP_PASSWORD
+fi
 echo "Public media (WebRTC) IP: $PUBLIC_MEDIA_IP (LAN: $LAN_MEDIA_IP)"
 echo "Router must forward UDP+TCP 40000-40050 to this machine for voice."
 
