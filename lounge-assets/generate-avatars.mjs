@@ -59,7 +59,8 @@ const VARIANTS = [
   // Photo-face avatars: the photo wraps the front of the head; the animated
   // mouth bar sits over the lips so speech still shows.
   { id: "red", skin: 0xecc4a4, hair: 0x9a5636, hairStyle: "long", shirt: 0x2e3a52, photo: "./face-red.jpg" },
-  { id: "gray", skin: 0xe4bc9c, hair: 0x8a8a84, hairStyle: "short", shirt: 0x38343c, photo: "./face-gray.jpg" }
+  { id: "gray", skin: 0xe4bc9c, hair: 0x8a8a84, hairStyle: "short", shirt: 0x38343c, photo: "./face-gray.jpg" },
+  { id: "red2", skin: 0xecc4a4, hair: 0x9a5636, hairStyle: "long", shirt: 0x3e6b58, photo: "./face-red2.jpg", mouthY: 0.024 }
 ];
 
 function mat(color, opts = {}) {
@@ -122,11 +123,36 @@ function buildAvatar(v) {
       roughness: 0.85,
       metalness: 0
     });
-    const faceGeo = new THREE.CylinderGeometry(0.108, 0.108, 0.2, 20, 1, true, -0.95, 1.9);
-    // glTF UV convention: flip v so the photo is upright.
-    const fuv = faceGeo.attributes.uv;
-    for (let i = 0; i < fuv.count; i++) fuv.setY(i, 1 - fuv.getY(i));
-    add(head, "FaceScreen", faceGeo, faceMat, 0, 0.068, 0.012);
+    // Head-shaped face shell: front section of the skull ellipsoid with the
+    // photo PLANAR-projected (not wrapped), plus subtle sculpted relief for
+    // nose, brow and chin so the profile reads as a face.
+    const faceGeo = new THREE.SphereGeometry(0.1065, 28, 22, Math.PI / 2 - 1.25, 2.5, 0.5, 2.15);
+    faceGeo.scale(0.92, 1.08, 0.98);
+    const pos = faceGeo.attributes.position;
+    const nrm = faceGeo.attributes.normal;
+    const gauss = (x, y, cx, cy, sx, sy) =>
+      Math.exp(-(((x - cx) * (x - cx)) / (2 * sx * sx) + ((y - cy) * (y - cy)) / (2 * sy * sy)));
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      if (z > 0.02) {
+        const front = Math.min(1, (z - 0.02) / 0.07);
+        const bump =
+          0.011 * gauss(x, y, 0, -0.018, 0.013, 0.03) + // nose
+          0.004 * gauss(x, y, 0, 0.028, 0.05, 0.012) +  // brow
+          0.005 * gauss(x, y, 0, -0.085, 0.022, 0.016) + // chin
+          0.003 * gauss(Math.abs(x), y, 0.05, -0.045, 0.02, 0.025); // cheeks
+        pos.setXYZ(i, x + nrm.getX(i) * bump * front, y + nrm.getY(i) * bump * front, z + nrm.getZ(i) * bump * front);
+      }
+    }
+    // Planar projection UVs from x/y (photo faces straight forward)
+    const uvAttr = faceGeo.attributes.uv;
+    const HX = 0.1065 * 0.92, HY = 0.1065 * 1.08;
+    for (let i = 0; i < uvAttr.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i);
+      uvAttr.setXY(i, x / (2 * HX * 0.98) + 0.5, 1 - (y / (2 * HY * 0.92) + 0.5));
+    }
+    faceGeo.computeVertexNormals();
+    add(head, "FaceScreen", faceGeo, faceMat, 0, 0.072, 0.014);
   }
   if (!v.photo) add(head, "Nose", new THREE.SphereGeometry(0.016, 6, 5), skin, 0, 0.055, 0.115);
   add(head, "EarL", new THREE.SphereGeometry(0.024, 6, 5), skin, 0.095, 0.07, 0.005);
@@ -141,7 +167,7 @@ function buildAvatar(v) {
   // --- Mouth node: scale-audio-feedback target ---
   const mouth = new THREE.Object3D();
   mouth.name = "Mouth";
-  mouth.position.set(0, v.photo ? 0.044 : 0.028, 0.1);
+  mouth.position.set(0, v.photo ? (v.mouthY ?? 0.044) : 0.028, 0.1);
   head.add(mouth);
   add(mouth, "MouthMesh", new THREE.BoxGeometry(0.042, 0.011, 0.012), dark, 0, 0, v.photo ? 0.026 : 0);
 
