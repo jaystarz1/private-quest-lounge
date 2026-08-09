@@ -1,2 +1,10 @@
 node_modules/
 package-lock.json
+face1-raw.jpg
+face2-raw.jpg
+face-red.jpg
+face-gray.jpg
+preview*.png
+preview.html
+avatars/avatar-red.glb
+avatars/avatar-gray.glb

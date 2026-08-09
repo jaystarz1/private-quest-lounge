@@ -55,7 +55,11 @@ const VARIANTS = [
   { id: "forest", skin: 0xf0c8a4, hair: 0x5c4330, hairStyle: "short", glasses: true, shirt: 0x3d5c3a },
   { id: "wine", skin: 0xc68a5c, hair: 0x1a1210, hairStyle: "long", glasses: true, shirt: 0x7a2e3a },
   { id: "sand", skin: 0xf0d0ac, hair: 0xc8a86a, hairStyle: "bun", shirt: 0xb89a6a },
-  { id: "night", skin: 0x6f4530, hair: 0x14100c, hairStyle: "bald", glasses: true, shirt: 0x2a3244 }
+  { id: "night", skin: 0x6f4530, hair: 0x14100c, hairStyle: "bald", glasses: true, shirt: 0x2a3244 },
+  // Photo-face avatars: the photo wraps the front of the head; the animated
+  // mouth bar sits over the lips so speech still shows.
+  { id: "red", skin: 0xecc4a4, hair: 0x9a5636, hairStyle: "long", shirt: 0x2e3a52, photo: "./face-red.jpg" },
+  { id: "gray", skin: 0xe4bc9c, hair: 0x8a8a84, hairStyle: "short", shirt: 0x38343c, photo: "./face-gray.jpg" }
 ];
 
 function mat(color, opts = {}) {
@@ -111,11 +115,24 @@ function buildAvatar(v) {
   const headGeo = new THREE.SphereGeometry(0.105, 14, 12);
   headGeo.scale(0.92, 1.08, 0.98);
   add(head, "Skull", headGeo, skin, 0, 0.075, 0.01);
-  add(head, "Nose", new THREE.SphereGeometry(0.016, 6, 5), skin, 0, 0.055, 0.115);
+  if (v.photo) {
+    const faceMat = new THREE.MeshStandardMaterial({
+      name: `Face_${v.id}`,
+      color: 0xffffff,
+      roughness: 0.85,
+      metalness: 0
+    });
+    const faceGeo = new THREE.CylinderGeometry(0.108, 0.108, 0.2, 20, 1, true, -0.95, 1.9);
+    // glTF UV convention: flip v so the photo is upright.
+    const fuv = faceGeo.attributes.uv;
+    for (let i = 0; i < fuv.count; i++) fuv.setY(i, 1 - fuv.getY(i));
+    add(head, "FaceScreen", faceGeo, faceMat, 0, 0.068, 0.012);
+  }
+  if (!v.photo) add(head, "Nose", new THREE.SphereGeometry(0.016, 6, 5), skin, 0, 0.055, 0.115);
   add(head, "EarL", new THREE.SphereGeometry(0.024, 6, 5), skin, 0.095, 0.07, 0.005);
   add(head, "EarR", new THREE.SphereGeometry(0.024, 6, 5), skin, -0.095, 0.07, 0.005);
   // Eyes: whites + pupils, at the upstream eye positions (slightly pulled in)
-  for (const s of [1, -1]) {
+  for (const s of v.photo ? [] : [1, -1]) {
     add(head, s > 0 ? "EyeL" : "EyeR", new THREE.SphereGeometry(0.02, 8, 6), white, s * 0.042, 0.085, 0.092);
     add(head, s > 0 ? "PupilL" : "PupilR", new THREE.SphereGeometry(0.009, 6, 5), dark, s * 0.042, 0.085, 0.108);
     add(head, s > 0 ? "BrowL" : "BrowR", new THREE.BoxGeometry(0.038, 0.008, 0.01), hair, s * 0.042, 0.115, 0.098);
@@ -124,12 +141,12 @@ function buildAvatar(v) {
   // --- Mouth node: scale-audio-feedback target ---
   const mouth = new THREE.Object3D();
   mouth.name = "Mouth";
-  mouth.position.set(0, 0.028, 0.1);
+  mouth.position.set(0, v.photo ? 0.044 : 0.028, 0.1);
   head.add(mouth);
-  add(mouth, "MouthMesh", new THREE.BoxGeometry(0.042, 0.011, 0.012), dark, 0, 0, 0);
+  add(mouth, "MouthMesh", new THREE.BoxGeometry(0.042, 0.011, 0.012), dark, 0, 0, v.photo ? 0.026 : 0);
 
-  // --- Hair ---
-  const hairY = 0.075, capR = 0.112;
+  // --- Hair (slightly larger on photo avatars so it frames the face) ---
+  const hairY = 0.075, capR = v.photo ? 0.121 : 0.112;
   if (v.hairStyle === "short") {
     const cap = new THREE.SphereGeometry(capR, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55);
     add(head, "Hair", cap, hair, 0, hairY + 0.005, -0.005);
@@ -193,7 +210,6 @@ async function exportAvatar(v) {
   const buf = Buffer.from(glb);
   const jsonLen = buf.readUInt32LE(12);
   const json = JSON.parse(buf.subarray(20, 20 + jsonLen).toString("utf8"));
-  const binChunk = buf.subarray(20 + jsonLen);
 
   json.extensionsUsed = [...new Set([...(json.extensionsUsed || []), "MOZ_hubs_components"])];
   json.extensions = { ...(json.extensions || {}), MOZ_hubs_components: { version: 4 } };
@@ -207,6 +223,38 @@ async function exportAvatar(v) {
     }
   }
   if (tagged !== 1) throw new Error(`Mouth node tagging failed for ${v.id}`);
+
+  let binChunk = buf.subarray(20 + jsonLen);
+  if (v.photo) {
+    const { readFileSync } = await import("fs");
+    const img = readFileSync(new URL(v.photo, import.meta.url));
+    let binData = Buffer.from(binChunk.subarray(8, 8 + binChunk.readUInt32LE(0)));
+    const pad = (4 - (binData.length % 4)) % 4;
+    const offset = binData.length + pad;
+    binData = Buffer.concat([binData, Buffer.alloc(pad), img]);
+    const endPad = (4 - (binData.length % 4)) % 4;
+    binData = Buffer.concat([binData, Buffer.alloc(endPad)]);
+    json.bufferViews = json.bufferViews || [];
+    json.bufferViews.push({ buffer: 0, byteOffset: offset, byteLength: img.length });
+    json.images = json.images || [];
+    json.images.push({ bufferView: json.bufferViews.length - 1, mimeType: "image/jpeg" });
+    json.samplers = json.samplers || [];
+    json.samplers.push({ magFilter: 9729, minFilter: 9987, wrapS: 33071, wrapT: 33071 });
+    json.textures = json.textures || [];
+    json.textures.push({ sampler: json.samplers.length - 1, source: json.images.length - 1 });
+    const m = (json.materials || []).find(mm => mm.name === `Face_${v.id}`);
+    if (!m) throw new Error(`Face material missing for ${v.id}`);
+    m.pbrMetallicRoughness = {
+      ...(m.pbrMetallicRoughness || {}),
+      baseColorTexture: { index: json.textures.length - 1 },
+      baseColorFactor: [1, 1, 1, 1]
+    };
+    const newBinHeader = Buffer.alloc(8);
+    newBinHeader.writeUInt32LE(binData.length, 0);
+    newBinHeader.writeUInt32LE(0x004e4942, 4);
+    binChunk = Buffer.concat([newBinHeader, binData]);
+    json.buffers[0].byteLength = binData.length;
+  }
 
   let jsonOut = Buffer.from(JSON.stringify(json), "utf8");
   const pad = (4 - (jsonOut.length % 4)) % 4;
