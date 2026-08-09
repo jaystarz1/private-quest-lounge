@@ -28,4 +28,17 @@ if ! pgrep -f "cloudflared tunnel --config $basedir/cloudflared-lounge.yml" > /d
 else
   echo "Cloudflare tunnel already running."
 fi
+# Re-assert router port mappings for voice media (UPnP; survives router reboots
+# as long as this re-runs) and keep the Mac awake while the lounge is up.
+if command -v upnpc >/dev/null; then
+  for port in $(seq 40000 40015); do
+    upnpc -e "quest-lounge-voice" -a "$LAN_MEDIA_IP" $port $port UDP 0 >/dev/null 2>&1
+    upnpc -e "quest-lounge-voice" -a "$LAN_MEDIA_IP" $port $port TCP 0 >/dev/null 2>&1
+  done
+  echo "UPnP voice port mappings asserted (40000-40015 -> $LAN_MEDIA_IP)."
+fi
+if ! pgrep -f "caffeinate -si" > /dev/null; then
+  nohup caffeinate -si > /dev/null 2>&1 &
+  echo "caffeinate started (Mac stays awake while plugged in)."
+fi
 echo "Lounge: https://lounge.thechatbotgenius.com"

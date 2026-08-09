@@ -48,6 +48,18 @@ bind mounts).
 
 `bin/down` stops everything.
 
+## The live deployment
+
+- **URL:** https://lounge.thechatbotgenius.com — front page is a PIN gate; the
+  right PIN decrypts and opens the fixed room (`/FxjfVW8/the-lounge`, cap 2).
+  Change the PIN with `LOUNGE_PIN=<pin> bin/up-public` (rebuild takes ~1 min).
+- **Runs on:** the operator's Mac via Cloudflare Tunnel `quest-lounge`
+  (`cloudflared-lounge.yml`); voice media flows directly over UDP/TCP
+  40000-40015, held open by UPnP mappings that `bin/up-public` re-asserts.
+- **Email:** magic links delivered by the operator's own Gmail via Apps Script
+  webhook (`GMAIL_WEBHOOK_URL`), falling back to Resend SMTP, then log-only.
+- `bin/up-public` starts everything: stack, tunnel, port mappings, caffeinate.
+
 ## What's different from stock Hubs
 
 See `ARCHITECTURE.md` for the full list. Headlines: every room is the bundled
