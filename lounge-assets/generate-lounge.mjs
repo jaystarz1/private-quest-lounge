@@ -268,8 +268,9 @@ function empty(name, x, y, z, ry) {
   scene.add(o);
   return o;
 }
-empty("Spawn_1", -1.9, 0, -2.15, Math.PI); // by the window, facing the room... ry set below
-empty("Spawn_2", 1.9, 0, 2.15, 0);
+// Spawned avatars face the waypoint's +z axis (verified by raycast test).
+empty("Spawn_1", -1.9, 0, -2.15, 0); // north-west corner, facing into the room (+z)
+empty("Spawn_2", 1.9, 0, 2.15, Math.PI); // south-east corner, facing into the room (-z)
 // Seat waypoints: y is tunable (0 = floor height at cushion centre).
 const SEAT_Y = 0;
 empty("Seat_A1", couchA.cushionX[0], SEAT_Y, couchA.z + 0.06, Math.PI); // couch A faces -z → yaw PI
