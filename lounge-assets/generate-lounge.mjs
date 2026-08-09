@@ -97,43 +97,60 @@ function cyl(name, rTop, rBot, h, material, x, y, z, seg = 12) {
 }
 
 // ---------------------------------------------------------------------------
-// Room shell: 6 wide (x) x 5 deep (z) x 3 high. Window on the -z wall.
+// Room shell: 12 wide (x, extended to the west) x 10 deep (z) x 3 high.
+// The whole north wall is floor-to-ceiling glass with a Canadian Rockies
+// valley (Moraine Lake, public domain) as the view.
 // ---------------------------------------------------------------------------
-const W = 6, D = 5, H = 3, T = 0.12; // wall thickness
-box("Floor", W, T, D, M.floor, 0, -T / 2, 0);
-box("Ceiling", W, T, D, M.ceiling, 0, H + T / 2, 0);
-box("Wall_East", T, H, D, M.wall, W / 2 + T / 2, H / 2, 0);
-box("Wall_West", T, H, D, M.wall, -W / 2 - T / 2, H / 2, 0);
-box("Wall_South", W + 2 * T, H, T, M.wall, 0, H / 2, D / 2 + T / 2);
+const X_MIN = -9, X_MAX = 3, Z_MIN = -5, Z_MAX = 5;
+const W = X_MAX - X_MIN, D = Z_MAX - Z_MIN, H = 3, T = 0.12; // wall thickness
+const CX = (X_MIN + X_MAX) / 2, CZ = (Z_MIN + Z_MAX) / 2;
+box("Floor", W, T, D, M.floor, CX, -T / 2, CZ);
+box("Ceiling", W, T, D, M.ceiling, CX, H + T / 2, CZ);
+box("Wall_East", T, H, D, M.wall, X_MAX + T / 2, H / 2, CZ);
+box("Wall_West", T, H, D, M.wall, X_MIN - T / 2, H / 2, CZ);
+box("Wall_South", W + 2 * T, H, T, M.wall, CX, H / 2, Z_MAX + T / 2);
 
-// North wall with window opening (2.2 x 1.4, sill at 0.95)
-const winW = 2.2, winH = 1.4, sill = 0.95;
-const nz = -D / 2 - T / 2;
-box("Wall_North_L", (W - winW) / 2 + 2 * T, H, T, M.wall, -(winW / 2 + (W - winW) / 4 + T), H / 2, nz);
-box("Wall_North_R", (W - winW) / 2 + 2 * T, H, T, M.wall, winW / 2 + (W - winW) / 4 + T, H / 2, nz);
-box("Wall_North_Bottom", winW, sill, T, M.wall, 0, sill / 2, nz);
-box("Wall_North_Top", winW, H - sill - winH, T, M.wall, 0, (H + sill + winH) / 2, nz);
-// Window frame + night glass
-box("WindowFrame_B", winW + 0.16, 0.08, 0.16, M.trim, 0, sill - 0.04, nz);
-box("WindowFrame_T", winW + 0.16, 0.08, 0.16, M.trim, 0, sill + winH + 0.04, nz);
-box("WindowFrame_L", 0.08, winH + 0.16, 0.16, M.trim, -winW / 2 - 0.04, sill + winH / 2, nz);
-box("WindowFrame_R", 0.08, winH + 0.16, 0.16, M.trim, winW / 2 + 0.04, sill + winH / 2, nz);
-box("WindowFrame_Mid", 0.05, winH, 0.14, M.trim, 0, sill + winH / 2, nz);
-const glass = box("NightGlass", winW, winH, 0.02, M.nightGlass, 0, sill + winH / 2, nz + 0.02);
-glass.name = "NightGlass";
-const moon = new THREE.Mesh(new THREE.CircleGeometry(0.13, 20), M.moon);
-moon.name = "Moon";
-moon.position.set(0.6, sill + winH - 0.32, nz + 0.035);
-scene.add(moon);
-// RainFX: a quad the client animates with a cheap shader (kept invisible-ish here)
-const rain = box("RainFX", winW, winH, 0.005, M.nightGlass.clone(), 0, sill + winH / 2, nz + 0.045);
-rain.material.transparent = true;
-rain.material.opacity = 0.25;
+// North glass wall: slim rails top/bottom, mullion posts, one big pane.
+const nz = Z_MIN;
+box("GlassRail_B", W, 0.09, 0.14, M.trim, CX, 0.045, nz);
+box("GlassRail_T", W, 0.09, 0.14, M.trim, CX, H - 0.045, nz);
+for (let i = 0; i <= 5; i++) {
+  const mx = X_MIN + (W / 5) * i;
+  box(`GlassMullion_${i}`, 0.07, H, 0.12, M.trim, Math.min(Math.max(mx, X_MIN + 0.035), X_MAX - 0.035), H / 2, nz);
+}
+const glassMat = new THREE.MeshStandardMaterial({
+  color: 0xbcd6e0,
+  transparent: true,
+  opacity: 0.1,
+  roughness: 0.05,
+  metalness: 0
+});
+box("GlassWall", W, H, 0.02, glassMat, CX, H / 2, nz);
 
-// Skirting
-box("Skirt_S", W, 0.1, 0.03, M.trim, 0, 0.05, D / 2 - 0.015);
-box("Skirt_E", 0.03, 0.1, D, M.trim, W / 2 - 0.015, 0.05, 0);
-box("Skirt_W", 0.03, 0.1, D, M.trim, -W / 2 + 0.015, 0.05, 0);
+// Rockies backdrop outside the glass (textured in post-processing).
+const backdropMat = new THREE.MeshStandardMaterial({
+  name: "RockiesBackdrop",
+  color: 0x000000,
+  emissive: 0xffffff,
+  emissiveIntensity: 1.0,
+  roughness: 1,
+  metalness: 0
+});
+const backdropGeo = new THREE.PlaneGeometry(22, 11);
+// glTF UV convention: v=0 is the image top; flip three.js default.
+{
+  const uv = backdropGeo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - uv.getY(i));
+}
+const backdrop = new THREE.Mesh(backdropGeo, backdropMat);
+backdrop.name = "RockiesView";
+backdrop.position.set(CX, 3.1, nz - 1.6);
+scene.add(backdrop);
+
+// Skirting (no skirt on the glass wall)
+box("Skirt_S", W, 0.1, 0.03, M.trim, CX, 0.05, Z_MAX - 0.015);
+box("Skirt_E", 0.03, 0.1, D, M.trim, X_MAX - 0.015, 0.05, CZ);
+box("Skirt_W", 0.03, 0.1, D, M.trim, X_MIN + 0.015, 0.05, CZ);
 
 // ---------------------------------------------------------------------------
 // Rug + coffee table + decor
@@ -204,6 +221,8 @@ function lamp(tag, x, z) {
 }
 lamp("L", -2.45, -1.9);
 lamp("R", 2.45, 1.9);
+lamp("C", -6.6, -3.9);
+lamp("D", -6.6, 3.9);
 
 // ---------------------------------------------------------------------------
 // Wall art (east + west walls)
@@ -227,8 +246,8 @@ function art(tag, x, z, ry, a, b) {
   g.rotation.y = ry;
   scene.add(g);
 }
-art("East", W / 2 - 0.03, 0.4, -Math.PI / 2, M.art1a, M.art1b);
-art("West", -W / 2 + 0.03, -0.4, Math.PI / 2, M.art2a, M.art2b);
+art("East", X_MAX - 0.03, 0.4, -Math.PI / 2, M.art1a, M.art1b);
+art("West", X_MIN + 0.03, -0.4, Math.PI / 2, M.art2a, M.art2b);
 
 // Plant in the corner
 cyl("Plant_Pot", 0.16, 0.12, 0.28, M.plantPot, 2.5, 0.14, -2.0);
@@ -239,10 +258,10 @@ cyl("Plant_Leaves", 0.02, 0.28, 0.75, M.plant, 2.5, 0.75, -2.0, 8);
 // Rectangles: [x1, z1, x2, z2]
 // ---------------------------------------------------------------------------
 const walkRects = [
-  [-2.8, -2.3, 2.8, -2.05], // north strip (window side)
-  [-2.8, 2.05, 2.8, 2.3],   // south strip
-  [-2.8, -2.05, -1.15, 2.05], // west corridor
-  [1.15, -2.05, 2.8, 2.05],   // east corridor
+  [-8.85, -4.85, 2.85, -2.05], // north area (by the glass wall)
+  [-8.85, 2.05, 2.85, 4.85],   // south area
+  [-8.85, -2.05, -1.15, 2.05], // western extension
+  [1.15, -2.05, 2.85, 2.05],   // east corridor
   [-1.15, -1.05, 1.15, -0.45], // between couch B and table
   [-1.15, 0.45, 1.15, 1.05]    // between table and couch A
 ];
@@ -291,7 +310,7 @@ empty("Seat_A1", couchA.cushionX[0], SEAT_Y, couchA.z + 0.06, Math.PI); // couch
 empty("Seat_A2", couchA.cushionX[1], SEAT_Y, couchA.z + 0.06, Math.PI);
 empty("Seat_B1", couchB.cushionX[0], SEAT_Y, couchB.z - 0.06, 0);
 empty("Seat_B2", couchB.cushionX[1], SEAT_Y, couchB.z - 0.06, 0);
-empty("AmbientLight", 0, H - 0.4, 0);
+empty("AmbientLight", CX, H - 0.4, 0);
 
 // ---------------------------------------------------------------------------
 // Hubs component map (node name → MOZ_hubs_components)
@@ -332,7 +351,8 @@ const HUBS_COMPONENTS = {
   Seat_B2: seatWaypoint("seat-b2"),
   LampL_Light: pointLight(1.4, 7),
   LampR_Light: pointLight(1.4, 7),
-  Moon: pointLight(0.4, 4),
+  LampC_Light: pointLight(1.4, 7),
+  LampD_Light: pointLight(1.4, 7),
   AmbientLight: { "ambient-light": { color: "#ffe2c4", intensity: 0.55 } }
 };
 
@@ -347,7 +367,38 @@ const glb = await new Promise((resolve, reject) =>
 const buf = Buffer.from(glb);
 const jsonLen = buf.readUInt32LE(12);
 const json = JSON.parse(buf.subarray(20, 20 + jsonLen).toString("utf8"));
-const binChunk = buf.subarray(20 + jsonLen); // includes its 8-byte chunk header
+let binChunk = buf.subarray(20 + jsonLen); // includes its 8-byte chunk header
+
+// --- Embed the Rockies photo (Moraine Lake, public domain) as the emissive
+// --- texture of the "RockiesBackdrop" material.
+{
+  const { readFileSync } = await import("fs");
+  const img = readFileSync(new URL("./rockies-wide.jpg", import.meta.url));
+  const binData = binChunk.subarray(8, 8 + binChunk.readUInt32LE(0));
+  const pad = (4 - (binData.length % 4)) % 4;
+  const imgPad = (4 - (img.length % 4)) % 4;
+  const newBinData = Buffer.concat([binData, Buffer.alloc(pad), img, Buffer.alloc(imgPad)]);
+  const newBinHeader = Buffer.alloc(8);
+  newBinHeader.writeUInt32LE(newBinData.length, 0);
+  newBinHeader.writeUInt32LE(0x004e4942, 4); // 'BIN'
+  binChunk = Buffer.concat([newBinHeader, newBinData]);
+
+  json.buffers[0].byteLength = newBinData.length;
+  json.bufferViews = json.bufferViews || [];
+  json.bufferViews.push({ buffer: 0, byteOffset: binData.length + pad, byteLength: img.length });
+  json.images = json.images || [];
+  json.images.push({ bufferView: json.bufferViews.length - 1, mimeType: "image/jpeg" });
+  json.samplers = json.samplers || [];
+  json.samplers.push({ magFilter: 9729, minFilter: 9987, wrapS: 33071, wrapT: 33071 });
+  json.textures = json.textures || [];
+  json.textures.push({ sampler: json.samplers.length - 1, source: json.images.length - 1 });
+
+  const bd = (json.materials || []).find(m => m.name === "RockiesBackdrop");
+  if (!bd) throw new Error("RockiesBackdrop material not found in export");
+  bd.emissiveTexture = { index: json.textures.length - 1 };
+  bd.emissiveFactor = [1, 1, 1];
+  bd.pbrMetallicRoughness = { ...(bd.pbrMetallicRoughness || {}), baseColorFactor: [0, 0, 0, 1] };
+}
 
 json.extensionsUsed = [...new Set([...(json.extensionsUsed || []), "MOZ_hubs_components"])];
 json.extensions = { ...(json.extensions || {}), MOZ_hubs_components: { version: 4 } };
