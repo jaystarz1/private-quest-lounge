@@ -28,14 +28,14 @@ services:
       HTTPS_CERT_PRIVKEY: /etc/ssl/privkey.pem
       INTERACTIVE: "false"
       MEDIASOUP_MIN_PORT: 40000
-      MEDIASOUP_MAX_PORT: 40015
+      MEDIASOUP_MAX_PORT: 40031
       MEDIASOUP_ANNOUNCED_IP: ${PRIVATE_NETWORK_IP}
     ports:
       - "4443:4443"
       # Must match MEDIASOUP_MIN_PORT..MEDIASOUP_MAX_PORT. Two participants
       # need only a handful of ports; keep the range small for startup time.
-      - "40000-40015:40000-40015"
-      - "40000-40015:40000-40015/udp"
+      - "40000-40031:40000-40031"
+      - "40000-40031:40000-40031/udp"
     volumes:
       - ./services/dialog:/code
       - dialog-node-modules:/code/node_modules
