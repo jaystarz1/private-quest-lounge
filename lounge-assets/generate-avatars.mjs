@@ -60,7 +60,9 @@ const VARIANTS = [
   // mouth bar sits over the lips so speech still shows.
   { id: "red", skin: 0xecc4a4, hair: 0x9a5636, hairStyle: "long", shirt: 0x2e3a52, photo: "./face-red.jpg" },
   { id: "gray", skin: 0xe4bc9c, hair: 0x8a8a84, hairStyle: "short", shirt: 0x38343c, photo: "./face-gray.jpg" },
-  { id: "red2", skin: 0xecc4a4, hair: 0x9a5636, hairStyle: "long", shirt: 0x3e6b58, photo: "./face-red2.jpg", mouthY: 0.024 }
+  { id: "red2", skin: 0xecc4a4, hair: 0x9a5636, hairStyle: "long", shirt: 0x3e6b58, photo: "./face-red2.jpg", mouthY: 0.024 },
+  { id: "jay", skin: 0xc6a088, hair: 0x484240, hairStyle: "short", shirt: 0xc86a4a,
+    photo: "./face-jay.jpg", headTex: "./head-jay.jpg", mouthY: 0.032 }
 ];
 
 function mat(color, opts = {}) {
@@ -113,9 +115,15 @@ function buildAvatar(v) {
   add(spine, "Collar", new THREE.CylinderGeometry(0.055, 0.075, 0.1, 8), skin, 0, 0.24, 0);
 
   // --- Head (under Head bone; face is +z) ---
-  const headGeo = new THREE.SphereGeometry(0.105, 14, 12);
+  const headGeo = new THREE.SphereGeometry(0.105, 18, 14);
   headGeo.scale(0.92, 1.08, 0.98);
-  add(head, "Skull", headGeo, v.photo ? hair : skin, 0, 0.075, 0.01);
+  let skullMat = v.photo ? hair : skin;
+  if (v.headTex) {
+    const huv = headGeo.attributes.uv;
+    for (let i = 0; i < huv.count; i++) huv.setY(i, 1 - huv.getY(i));
+    skullMat = new THREE.MeshStandardMaterial({ name: `Head_${v.id}`, color: 0xffffff, roughness: 0.9, metalness: 0 });
+  }
+  add(head, "Skull", headGeo, skullMat, 0, 0.075, 0.01);
   if (v.photo) {
     const faceMat = new THREE.MeshStandardMaterial({
       name: `Face_${v.id}`,
@@ -264,30 +272,35 @@ async function exportAvatar(v) {
   if (tagged !== 1) throw new Error(`Mouth node tagging failed for ${v.id}`);
 
   let binChunk = buf.subarray(20 + jsonLen);
-  if (v.photo) {
+  const embeds = [];
+  if (v.photo) embeds.push({ file: v.photo, material: `Face_${v.id}`, wrap: 33071 });
+  if (v.headTex) embeds.push({ file: v.headTex, material: `Head_${v.id}`, wrap: 10497 });
+  if (embeds.length) {
     const { readFileSync } = await import("fs");
-    const img = readFileSync(new URL(v.photo, import.meta.url));
     let binData = Buffer.from(binChunk.subarray(8, 8 + binChunk.readUInt32LE(0)));
-    const pad = (4 - (binData.length % 4)) % 4;
-    const offset = binData.length + pad;
-    binData = Buffer.concat([binData, Buffer.alloc(pad), img]);
+    json.bufferViews = json.bufferViews || [];
+    json.images = json.images || [];
+    json.samplers = json.samplers || [];
+    json.textures = json.textures || [];
+    for (const e of embeds) {
+      const img = readFileSync(new URL(e.file, import.meta.url));
+      const pad = (4 - (binData.length % 4)) % 4;
+      const offset = binData.length + pad;
+      binData = Buffer.concat([binData, Buffer.alloc(pad), img]);
+      json.bufferViews.push({ buffer: 0, byteOffset: offset, byteLength: img.length });
+      json.images.push({ bufferView: json.bufferViews.length - 1, mimeType: "image/jpeg" });
+      json.samplers.push({ magFilter: 9729, minFilter: 9987, wrapS: e.wrap, wrapT: e.wrap });
+      json.textures.push({ sampler: json.samplers.length - 1, source: json.images.length - 1 });
+      const m = (json.materials || []).find(mm => mm.name === e.material);
+      if (!m) throw new Error(`${e.material} material missing for ${v.id}`);
+      m.pbrMetallicRoughness = {
+        ...(m.pbrMetallicRoughness || {}),
+        baseColorTexture: { index: json.textures.length - 1 },
+        baseColorFactor: [1, 1, 1, 1]
+      };
+    }
     const endPad = (4 - (binData.length % 4)) % 4;
     binData = Buffer.concat([binData, Buffer.alloc(endPad)]);
-    json.bufferViews = json.bufferViews || [];
-    json.bufferViews.push({ buffer: 0, byteOffset: offset, byteLength: img.length });
-    json.images = json.images || [];
-    json.images.push({ bufferView: json.bufferViews.length - 1, mimeType: "image/jpeg" });
-    json.samplers = json.samplers || [];
-    json.samplers.push({ magFilter: 9729, minFilter: 9987, wrapS: 33071, wrapT: 33071 });
-    json.textures = json.textures || [];
-    json.textures.push({ sampler: json.samplers.length - 1, source: json.images.length - 1 });
-    const m = (json.materials || []).find(mm => mm.name === `Face_${v.id}`);
-    if (!m) throw new Error(`Face material missing for ${v.id}`);
-    m.pbrMetallicRoughness = {
-      ...(m.pbrMetallicRoughness || {}),
-      baseColorTexture: { index: json.textures.length - 1 },
-      baseColorFactor: [1, 1, 1, 1]
-    };
     const newBinHeader = Buffer.alloc(8);
     newBinHeader.writeUInt32LE(binData.length, 0);
     newBinHeader.writeUInt32LE(0x004e4942, 4);
