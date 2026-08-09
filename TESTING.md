@@ -40,6 +40,38 @@ Rendering: WebGL renders; the room shows a dark void because the dev database
 seeds no scene (environment loads the stock loading-scene with spawn point +
 nav mesh). Replaced by the lounge scene in Phase 2.
 
+## Phase 2: private lounge verification (2026-08-08, local, automated)
+
+Room `XDmNmuE` created by the admin account; all values read from live page
+state. Screenshots in `docs/screenshots/`.
+
+| Check | Result |
+|---|---|
+| Room `room_size` | 2 |
+| Member permissions | voice_chat + text_chat only (all spawning false) |
+| Lounge scene loads (63 meshes, bbox 6.4 x 3.2 x 5.2 m) | ✓ |
+| Nav mesh + 2 spawn points + 4 seat waypoints inflated | ✓ |
+| Spawn faces into the room (raycast: nearest wall 4.5 m) | ✓ |
+| Preset avatar auto-assigned to both users (amber…plum set) | ✓ |
+| Both users see each other's avatar + nameplate + voice ring | ✓ |
+| Seat: `tryToOccupy(Seat_A1)` → occupied, rig at cushion (-0.44, 0, 1.46) | ✓ |
+| Stand up: return to spawn releases seat | ✓ |
+| Third participant: `canEnterRoom` false, never enters (lobby only) | ✓ |
+| Anonymous user: no Create Room control anywhere | ✓ |
+| Bad invite URL → "bad Room ID" screen | ✓ |
+
+## Phase 3: performance + failure modes (2026-08-08, local, automated)
+
+- Renderer with 2 avatars in room: **64 draw calls, 2,104 triangles,
+  21 textures** — far inside Quest 2 budget (the usual mobile-VR guidance is
+  ≤100 calls / ≤300k tris).
+- Peer disconnect (tab closed): remaining user sees "Guest left the room" in
+  the presence log within seconds; presence count drops 2 → 1.
+- Rejoin: same invite URL re-enters cleanly; presence back to 2.
+- Microphone denied (`getUserMedia` → NotAllowedError): user still enters the
+  room muted; mic feedback shown in the setup screen.
+- Room already full: third client held in lobby (see Phase 2).
+
 ## Quest Browser checklist (to run on hardware)
 
 - [ ] Open invite URL in Meta Quest Browser (deployed HTTPS instance; Quest will not accept the local self-signed certs without fuss)
