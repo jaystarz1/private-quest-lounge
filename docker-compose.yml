@@ -1,4 +1,11 @@
 version: "3.9"
+
+# private-quest-lounge: forked from Hubs-Foundation/hubs-compose.
+# Mutagen sync replaced with direct bind mounts (mutagen-compose 0.18.x speaks
+# Docker API 1.43, which Docker Desktop >= 29 refuses). Named volumes mask
+# container-built artifacts (node_modules, Elixir _build) so linux/amd64
+# binaries never mix with the macOS host checkout.
+
 services:
   db:
     environment:
@@ -25,13 +32,13 @@ services:
       MEDIASOUP_ANNOUNCED_IP: ${PRIVATE_NETWORK_IP}
     ports:
       - "4443:4443"
-      # This should be the same as MEDIASOUP_MIN_PORT and MEDIASOUP_MAX_PORT
-      # You might neeed to increase this number depending on how many clients you are connecting.
-      # (Keep the ports range small to improve container startup time)
+      # Must match MEDIASOUP_MIN_PORT..MEDIASOUP_MAX_PORT. Two participants
+      # need only a handful of ports; keep the range small for startup time.
       - "40000-40050:40000-40050"
       - "40000-40050:40000-40050/udp"
     volumes:
-      - dialog:/code
+      - ./services/dialog:/code
+      - dialog-node-modules:/code/node_modules
     working_dir: /code
   hubs-admin:
     build:
@@ -46,7 +53,9 @@ services:
     ports:
       - "8989:8989"
     volumes:
-      - hubs:/code
+      - ./services/hubs:/code
+      - hubs-node-modules:/code/node_modules
+      - hubs-admin-node-modules:/code/admin/node_modules
     working_dir: /code/admin
   hubs-client:
     build:
@@ -62,7 +71,9 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - hubs:/code
+      - ./services/hubs:/code
+      - hubs-node-modules:/code/node_modules
+      - hubs-admin-node-modules:/code/admin/node_modules
     working_dir: /code
   hubs-storybook:
     build:
@@ -74,8 +85,11 @@ services:
     platform: linux/amd64
     ports:
       - "6006:6006"
+    profiles: ["extras"]
     volumes:
-      - hubs:/code
+      - ./services/hubs:/code
+      - hubs-node-modules:/code/node_modules
+      - hubs-admin-node-modules:/code/admin/node_modules
     working_dir: /code
   postgrest:
     build:
@@ -100,7 +114,8 @@ services:
     ports:
       - "4000:4000"
     volumes:
-      - reticulum:/code
+      - ./services/reticulum:/code
+      - reticulum-build:/code/_build
       - retstorage:/code/storage/dev
   spoke:
     build:
@@ -112,48 +127,18 @@ services:
     platform: linux/amd64
     ports:
       - "9090:9090"
+    profiles: ["extras"]
     volumes:
-      - spoke:/code
+      - ./services/spoke:/code
+      - spoke-node-modules:/code/node_modules
 networks:
   default:
     name: mozilla-hubs
 volumes:
-  dialog:
-  hubs:
+  dialog-node-modules:
+  hubs-node-modules:
+  hubs-admin-node-modules:
   pgdata:
-  reticulum:
+  reticulum-build:
   retstorage:
-  spoke:
-x-mutagen:
-  sync:
-    defaults:
-      ignore:
-        paths:
-          - ".DS_Store"
-          - ".gitignore"
-          - "/certs/"
-          - "/node_modules/"
-          - "package-lock.sha512"
-        vcs: true
-      mode: "two-way-resolved"
-    dialog:
-      alpha: ./services/dialog
-      beta: "volume://dialog"
-    hubs:
-      alpha: ./services/hubs
-      beta: "volume://hubs"
-      ignore:
-        paths:
-          - "/admin/certs/"
-          - "/admin/node_modules/"
-    reticulum:
-      alpha: ./services/reticulum
-      beta: "volume://reticulum"
-      ignore:
-        paths:
-          - "/_build/"
-          - "/bin/"
-          - "/storage/"
-    spoke:
-      alpha: ./services/spoke
-      beta: "volume://spoke"
+  spoke-node-modules:

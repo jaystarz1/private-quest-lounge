@@ -1,8 +1,5 @@
 #!/bin/bash
-basedir=$(dirname "$0")/..
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    IP_ADDR=$(ifconfig -l | xargs -n1 ipconfig getifaddr)
-elif [[ "$OSTYPE" == "darwin"* ]]; then
-    IP_ADDR=$(ip route get 1 | awk '{print $NF;exit}')
-fi
-PRIVATE_NETWORK_IP=${ADDR} mutagen-compose -f "$basedir"/docker-compose.yml down
+basedir=$(cd "$(dirname "$0")"/.. && pwd)
+source "$basedir"/bin/lib-env
+
+compose down "$@"

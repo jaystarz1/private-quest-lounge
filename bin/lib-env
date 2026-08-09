@@ -1,0 +1,19 @@
+#!/bin/bash
+# Shared environment for private-quest-lounge scripts.
+# Fixes two upstream bugs: IP_ADDR was assigned but ${ADDR} (empty) was used,
+# and the Linux/macOS detection branches were swapped.
+
+if [ -d "/Applications/Docker.app/Contents/Resources/bin" ]; then
+  export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
+fi
+
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  PRIVATE_NETWORK_IP=$(ifconfig -l | xargs -n1 ipconfig getifaddr 2>/dev/null | head -n1)
+else
+  PRIVATE_NETWORK_IP=$(ip route get 1 2>/dev/null | awk '{print $7; exit}')
+fi
+export PRIVATE_NETWORK_IP=${PRIVATE_NETWORK_IP:-127.0.0.1}
+
+compose() {
+  docker compose -f "$basedir"/docker-compose.yml "$@"
+}

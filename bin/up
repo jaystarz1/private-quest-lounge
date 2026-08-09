@@ -1,17 +1,6 @@
 #!/bin/bash
-basedir=$(dirname "$0")/..
+basedir=$(cd "$(dirname "$0")"/.. && pwd)
+source "$basedir"/bin/lib-env
 
-prefix='\n\033[1;37m'
-suffix='\033[0m\n'
-echo -e ${prefix}Starting mutagen daemon...$suffix
-mutagen daemon start
-echo -e ${prefix}The mutagen daemon will stay running until you stop it manually with \`mutagen daemon stop\`.$suffix
-
-echo -e ${prefix}Running mutagen-compose...$suffix
-
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    IP_ADDR=$(ifconfig -l | xargs -n1 ipconfig getifaddr)
-elif [[ "$OSTYPE" == "darwin"* ]]; then
-    IP_ADDR=$(ip route get 1 | awk '{print $NF;exit}')
-fi
-PRIVATE_NETWORK_IP=${ADDR} mutagen-compose -f "$basedir"/docker-compose.yml up --build --detach
+echo "Starting private-quest-lounge (announced IP: $PRIVATE_NETWORK_IP)..."
+compose up --build --detach "$@"
