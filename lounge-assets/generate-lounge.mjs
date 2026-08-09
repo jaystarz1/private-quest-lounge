@@ -252,6 +252,18 @@ const navGeoms = walkRects.map(([x1, z1, x2, z2]) => {
   gm.translate((x1 + x2) / 2, 0.002, (z1 + z2) / 2);
   return gm;
 });
+// Cushion tops are teleportable islands: you can point-and-teleport straight
+// onto a couch seat. (Seat waypoints land here via shouldLandWhenPossible.)
+const CUSHION_TOP = 0.45;
+for (const [cx, cz] of [
+  [-0.44, couchA.z + 0.06], [0.44, couchA.z + 0.06],
+  [-0.44, couchB.z - 0.06], [0.44, couchB.z - 0.06]
+]) {
+  const gm = new THREE.PlaneGeometry(0.72, 0.5);
+  gm.rotateX(-Math.PI / 2);
+  gm.translate(cx, CUSHION_TOP + 0.005, cz);
+  navGeoms.push(gm);
+}
 const navMesh = new THREE.Mesh(mergeGeometries(navGeoms), mat(0x00ff00));
 navMesh.name = "NavMesh";
 scene.add(navMesh);
@@ -271,8 +283,10 @@ function empty(name, x, y, z, ry) {
 // Spawned avatars face the waypoint's +z axis (verified by raycast test).
 empty("Spawn_1", -1.9, 0, -2.15, 0); // north-west corner, facing into the room (+z)
 empty("Spawn_2", 1.9, 0, 2.15, Math.PI); // south-east corner, facing into the room (-z)
-// Seat waypoints: y is tunable (0 = floor height at cushion centre).
-const SEAT_Y = 0;
+// Seat waypoints float above the cushions so their icons are visible and
+// clickable (an icon at floor level ends up buried inside the couch base).
+// The character controller lands on the cushion nav-mesh island after travel.
+const SEAT_Y = 0.55;
 empty("Seat_A1", couchA.cushionX[0], SEAT_Y, couchA.z + 0.06, Math.PI); // couch A faces -z → yaw PI
 empty("Seat_A2", couchA.cushionX[1], SEAT_Y, couchA.z + 0.06, Math.PI);
 empty("Seat_B1", couchB.cushionX[0], SEAT_Y, couchB.z - 0.06, 0);
