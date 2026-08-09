@@ -4,8 +4,9 @@ basedir=$(cd "$(dirname "$0")"/.. && pwd)
 source "$basedir"/bin/lib-env
 
 PUBLIC_MEDIA_IP=${PUBLIC_MEDIA_IP:-$(curl -s --max-time 10 https://api.ipify.org)}
-export PUBLIC_MEDIA_IP
-echo "Public media (WebRTC) IP: $PUBLIC_MEDIA_IP"
+LAN_MEDIA_IP=${LAN_MEDIA_IP:-$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1)}
+export PUBLIC_MEDIA_IP LAN_MEDIA_IP
+echo "Public media (WebRTC) IP: $PUBLIC_MEDIA_IP (LAN: $LAN_MEDIA_IP)"
 echo "Router must forward UDP+TCP 40000-40050 to this machine for voice."
 
 docker compose -f "$basedir"/docker-compose.yml -f "$basedir"/docker-compose.public.yml up --build --detach
