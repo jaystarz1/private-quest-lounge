@@ -1,0 +1,24 @@
+# Public-tunnel overlay: run the stack behind Cloudflare Tunnel hostnames.
+#   bin/up-public   (equivalent to: docker compose -f docker-compose.yml -f docker-compose.public.yml up -d)
+#
+# lounge.thechatbotgenius.com       -> reticulum :4000  (pages, API, presence WSS)
+# lounge-app.thechatbotgenius.com   -> hubs-client :8080 (webpack assets)
+# lounge-voice.thechatbotgenius.com -> dialog :4443      (protoo signaling WSS)
+# Voice MEDIA is direct UDP/TCP 40000-40050 to this machine's public IP —
+# requires a router port-forward; announced IP comes from PUBLIC_MEDIA_IP.
+services:
+  reticulum:
+    environment:
+      RET_HOST: ${PUBLIC_HOST:-lounge.thechatbotgenius.com}
+      RET_PUBLIC_PORT: "443"
+      RET_PUBLIC_ASSETS_HOST: ${PUBLIC_ASSETS_HOST:-lounge-app.thechatbotgenius.com}
+      RET_PUBLIC_VOICE_HOST: ${PUBLIC_VOICE_HOST:-lounge-voice.thechatbotgenius.com}
+      DIALOG_HOSTNAME: ${PUBLIC_VOICE_HOST:-lounge-voice.thechatbotgenius.com}
+      DIALOG_PORT: "443"
+  hubs-client:
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:-lounge.thechatbotgenius.com}
+      PUBLIC_ASSETS_HOST: ${PUBLIC_ASSETS_HOST:-lounge-app.thechatbotgenius.com}
+  dialog:
+    environment:
+      MEDIASOUP_ANNOUNCED_IP: ${PUBLIC_MEDIA_IP}

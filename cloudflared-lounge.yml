@@ -1,0 +1,21 @@
+# Cloudflare Tunnel config for private-quest-lounge (tunnel: quest-lounge).
+# Run with: cloudflared tunnel --config cloudflared-lounge.yml run
+# Deliberately a separate file — does NOT touch ~/.cloudflared/config.yml
+# (which belongs to book-dashboard).
+tunnel: a7a1a3b9-0d58-42e9-97c6-f153b3c5c43c
+credentials-file: /Users/jaytarzwell/.cloudflared/a7a1a3b9-0d58-42e9-97c6-f153b3c5c43c.json
+
+ingress:
+  - hostname: lounge.thechatbotgenius.com
+    service: https://localhost:4000
+    originRequest:
+      noTLSVerify: true
+  - hostname: lounge-app.thechatbotgenius.com
+    service: https://localhost:8080
+    originRequest:
+      noTLSVerify: true
+  - hostname: lounge-voice.thechatbotgenius.com
+    service: https://localhost:4443
+    originRequest:
+      noTLSVerify: true
+  - service: http_status:404

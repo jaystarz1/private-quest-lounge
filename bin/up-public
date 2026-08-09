@@ -1,0 +1,20 @@
+#!/bin/bash
+# Start the lounge stack in public-tunnel mode + the Cloudflare tunnel.
+basedir=$(cd "$(dirname "$0")"/.. && pwd)
+source "$basedir"/bin/lib-env
+
+PUBLIC_MEDIA_IP=${PUBLIC_MEDIA_IP:-$(curl -s --max-time 10 https://api.ipify.org)}
+export PUBLIC_MEDIA_IP
+echo "Public media (WebRTC) IP: $PUBLIC_MEDIA_IP"
+echo "Router must forward UDP+TCP 40000-40050 to this machine for voice."
+
+docker compose -f "$basedir"/docker-compose.yml -f "$basedir"/docker-compose.public.yml up --build --detach
+
+if ! pgrep -f "cloudflared tunnel --config $basedir/cloudflared-lounge.yml" > /dev/null; then
+  echo "Starting Cloudflare tunnel (logs: $basedir/cloudflared-lounge.log)..."
+  nohup cloudflared tunnel --config "$basedir"/cloudflared-lounge.yml run > "$basedir"/cloudflared-lounge.log 2>&1 &
+  echo $! > "$basedir"/cloudflared-lounge.pid
+else
+  echo "Cloudflare tunnel already running."
+fi
+echo "Lounge: https://lounge.thechatbotgenius.com"
