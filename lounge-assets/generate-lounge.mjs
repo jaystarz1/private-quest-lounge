@@ -33,6 +33,7 @@ const out = process.argv[2] || "lounge.glb";
 // ---------------------------------------------------------------------------
 const M = {
   floor: mat(0x7a5537, { roughness: 0.85 }),
+  logWall: new THREE.MeshStandardMaterial({ name: "LogWall", color: 0xffffff, roughness: 0.92, metalness: 0 }),
   wall: mat(0xe6dac2, { roughness: 0.95 }),
   ceiling: mat(0xf0e8d8, { roughness: 0.95 }),
   trim: mat(0x5c4330, { roughness: 0.8 }),
@@ -95,6 +96,18 @@ function cyl(name, rTop, rBot, h, material, x, y, z, seg = 12) {
   scene.add(m);
   return m;
 }
+// Box with UVs scaled so a square tiling texture repeats every `period` metres.
+function texturedBox(name, w, h, d, material, x, y, z, period) {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  const uv = geo.attributes.uv;
+  const ru = Math.max(w, d) / period, rv = h / period;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * ru, uv.getY(i) * rv);
+  const m = new THREE.Mesh(geo, material);
+  m.name = name;
+  m.position.set(x, y, z);
+  scene.add(m);
+  return m;
+}
 
 // ---------------------------------------------------------------------------
 // Room shell: 12 wide (x, extended to the west) x 10 deep (z) x 3 high.
@@ -102,21 +115,28 @@ function cyl(name, rTop, rBot, h, material, x, y, z, seg = 12) {
 // valley (Moraine Lake, public domain) as the view.
 // ---------------------------------------------------------------------------
 const X_MIN = -9, X_MAX = 3, Z_MIN = -5, Z_MAX = 5;
-const W = X_MAX - X_MIN, D = Z_MAX - Z_MIN, H = 3, T = 0.12; // wall thickness
+const W = X_MAX - X_MIN, D = Z_MAX - Z_MIN, T = 0.12; // wall thickness
+const H = 3;        // south-wall height
+const H_N = 4.5;    // glass-wall height (5 ft higher); roof slopes up to it
 const CX = (X_MIN + X_MAX) / 2, CZ = (Z_MIN + Z_MAX) / 2;
+const LOG_PERIOD = 1.8; // metres of wall per texture tile (~6 logs)
 box("Floor", W, T, D, M.floor, CX, -T / 2, CZ);
-box("Ceiling", W, T, D, M.ceiling, CX, H + T / 2, CZ);
-box("Wall_East", T, H, D, M.wall, X_MAX + T / 2, H / 2, CZ);
-box("Wall_West", T, H, D, M.wall, X_MIN - T / 2, H / 2, CZ);
-box("Wall_South", W + 2 * T, H, T, M.wall, CX, H / 2, Z_MAX + T / 2);
+// Sloped timber roof rising from the south wall (3 m) to the glass wall (4.5 m)
+const slope = Math.atan((H_N - H) / D);
+const roof = box("Roof", W, T, D / Math.cos(slope) + 0.2, mat(0x8a6242, { roughness: 0.85 }), CX, (H + H_N) / 2 + T / 2, CZ);
+roof.rotation.x = slope;
+// Log walls (east/west run full height; the roof hides their tops)
+texturedBox("Wall_East", T, H_N, D, M.logWall, X_MAX + T / 2, H_N / 2, CZ, LOG_PERIOD);
+texturedBox("Wall_West", T, H_N, D, M.logWall, X_MIN - T / 2, H_N / 2, CZ, LOG_PERIOD);
+texturedBox("Wall_South", W + 2 * T, H, T, M.logWall, CX, H / 2, Z_MAX + T / 2, LOG_PERIOD);
 
 // North glass wall: slim rails top/bottom, mullion posts, one big pane.
 const nz = Z_MIN;
 box("GlassRail_B", W, 0.09, 0.14, M.trim, CX, 0.045, nz);
-box("GlassRail_T", W, 0.09, 0.14, M.trim, CX, H - 0.045, nz);
+box("GlassRail_T", W, 0.09, 0.14, M.trim, CX, H_N - 0.045, nz);
 for (let i = 0; i <= 5; i++) {
   const mx = X_MIN + (W / 5) * i;
-  box(`GlassMullion_${i}`, 0.07, H, 0.12, M.trim, Math.min(Math.max(mx, X_MIN + 0.035), X_MAX - 0.035), H / 2, nz);
+  box(`GlassMullion_${i}`, 0.07, H_N, 0.12, M.trim, Math.min(Math.max(mx, X_MIN + 0.035), X_MAX - 0.035), H_N / 2, nz);
 }
 const glassMat = new THREE.MeshStandardMaterial({
   color: 0xbcd6e0,
@@ -125,7 +145,7 @@ const glassMat = new THREE.MeshStandardMaterial({
   roughness: 0.05,
   metalness: 0
 });
-box("GlassWall", W, H, 0.02, glassMat, CX, H / 2, nz);
+box("GlassWall", W, H_N, 0.02, glassMat, CX, H_N / 2, nz);
 
 // Rockies backdrop outside the glass (textured in post-processing).
 const backdropMat = new THREE.MeshStandardMaterial({
@@ -136,7 +156,7 @@ const backdropMat = new THREE.MeshStandardMaterial({
   roughness: 1,
   metalness: 0
 });
-const backdropGeo = new THREE.PlaneGeometry(22, 11);
+const backdropGeo = new THREE.PlaneGeometry(26, 13);
 // glTF UV convention: v=0 is the image top; flip three.js default.
 {
   const uv = backdropGeo.attributes.uv;
@@ -144,7 +164,7 @@ const backdropGeo = new THREE.PlaneGeometry(22, 11);
 }
 const backdrop = new THREE.Mesh(backdropGeo, backdropMat);
 backdrop.name = "RockiesView";
-backdrop.position.set(CX, 3.1, nz - 1.6);
+backdrop.position.set(CX, 4.0, nz - 1.8);
 scene.add(backdrop);
 
 // Skirting (no skirt on the glass wall)
@@ -369,35 +389,56 @@ const jsonLen = buf.readUInt32LE(12);
 const json = JSON.parse(buf.subarray(20, 20 + jsonLen).toString("utf8"));
 let binChunk = buf.subarray(20 + jsonLen); // includes its 8-byte chunk header
 
-// --- Embed the Rockies photo (Moraine Lake, public domain) as the emissive
-// --- texture of the "RockiesBackdrop" material.
+// --- Embed photo textures into the GLB binary chunk:
+// ---  * Rockies view (Moraine Lake, public domain) -> emissive backdrop
+// ---  * Log wall (Poly Haven beam_wall_01, CC0, warmed) -> tiling base colour
 {
   const { readFileSync } = await import("fs");
-  const img = readFileSync(new URL("./rockies-wide.jpg", import.meta.url));
-  const binData = binChunk.subarray(8, 8 + binChunk.readUInt32LE(0));
-  const pad = (4 - (binData.length % 4)) % 4;
-  const imgPad = (4 - (img.length % 4)) % 4;
-  const newBinData = Buffer.concat([binData, Buffer.alloc(pad), img, Buffer.alloc(imgPad)]);
-  const newBinHeader = Buffer.alloc(8);
-  newBinHeader.writeUInt32LE(newBinData.length, 0);
-  newBinHeader.writeUInt32LE(0x004e4942, 4); // 'BIN'
-  binChunk = Buffer.concat([newBinHeader, newBinData]);
+  const REPEAT = 10497, CLAMP = 33071;
+  const EMBEDS = [
+    { file: "./rockies-wide.jpg", material: "RockiesBackdrop", slot: "emissive", wrap: CLAMP },
+    { file: "./logwall.jpg", material: "LogWall", slot: "base", wrap: REPEAT }
+  ];
 
-  json.buffers[0].byteLength = newBinData.length;
+  let binData = Buffer.from(binChunk.subarray(8, 8 + binChunk.readUInt32LE(0)));
   json.bufferViews = json.bufferViews || [];
-  json.bufferViews.push({ buffer: 0, byteOffset: binData.length + pad, byteLength: img.length });
   json.images = json.images || [];
-  json.images.push({ bufferView: json.bufferViews.length - 1, mimeType: "image/jpeg" });
   json.samplers = json.samplers || [];
-  json.samplers.push({ magFilter: 9729, minFilter: 9987, wrapS: 33071, wrapT: 33071 });
   json.textures = json.textures || [];
-  json.textures.push({ sampler: json.samplers.length - 1, source: json.images.length - 1 });
 
-  const bd = (json.materials || []).find(m => m.name === "RockiesBackdrop");
-  if (!bd) throw new Error("RockiesBackdrop material not found in export");
-  bd.emissiveTexture = { index: json.textures.length - 1 };
-  bd.emissiveFactor = [1, 1, 1];
-  bd.pbrMetallicRoughness = { ...(bd.pbrMetallicRoughness || {}), baseColorFactor: [0, 0, 0, 1] };
+  for (const e of EMBEDS) {
+    const img = readFileSync(new URL(e.file, import.meta.url));
+    const pad = (4 - (binData.length % 4)) % 4;
+    const offset = binData.length + pad;
+    binData = Buffer.concat([binData, Buffer.alloc(pad), img]);
+    json.bufferViews.push({ buffer: 0, byteOffset: offset, byteLength: img.length });
+    json.images.push({ bufferView: json.bufferViews.length - 1, mimeType: "image/jpeg" });
+    json.samplers.push({ magFilter: 9729, minFilter: 9987, wrapS: e.wrap, wrapT: e.wrap });
+    json.textures.push({ sampler: json.samplers.length - 1, source: json.images.length - 1 });
+    const texIndex = json.textures.length - 1;
+
+    const m = (json.materials || []).find(mm => mm.name === e.material);
+    if (!m) throw new Error(`${e.material} material not found in export`);
+    if (e.slot === "emissive") {
+      m.emissiveTexture = { index: texIndex };
+      m.emissiveFactor = [1, 1, 1];
+      m.pbrMetallicRoughness = { ...(m.pbrMetallicRoughness || {}), baseColorFactor: [0, 0, 0, 1] };
+    } else {
+      m.pbrMetallicRoughness = {
+        ...(m.pbrMetallicRoughness || {}),
+        baseColorTexture: { index: texIndex },
+        baseColorFactor: [1, 1, 1, 1]
+      };
+    }
+  }
+
+  const endPad = (4 - (binData.length % 4)) % 4;
+  binData = Buffer.concat([binData, Buffer.alloc(endPad)]);
+  const newBinHeader = Buffer.alloc(8);
+  newBinHeader.writeUInt32LE(binData.length, 0);
+  newBinHeader.writeUInt32LE(0x004e4942, 4); // 'BIN'
+  binChunk = Buffer.concat([newBinHeader, binData]);
+  json.buffers[0].byteLength = binData.length;
 }
 
 json.extensionsUsed = [...new Set([...(json.extensionsUsed || []), "MOZ_hubs_components"])];

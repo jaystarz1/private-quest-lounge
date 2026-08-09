@@ -17,6 +17,7 @@ project by generator scripts in `lounge-assets/`:
 | `lounge.glb` (room, furniture, lamps, window, art) | `generate-lounge.mjs` (procedural geometry, flat colours, no textures) | Same as repo |
 | `avatar-*.glb` × 6 | `generate-avatars.mjs` (procedural; bone naming/proportions follow the upstream MPL-2.0 `DefaultAvatar.glb` skeleton convention, no upstream mesh data copied) | Same as repo |
 | Rockies window view (embedded in `lounge.glb`) | [Moraine Lake 17092005.jpg](https://commons.wikimedia.org/wiki/File:Moraine_Lake_17092005.jpg), Wikimedia Commons | **Public domain** |
+| Log wall texture (embedded in `lounge.glb`, colour-warmed) | [Beam Wall 01](https://polyhaven.com/a/beam_wall_01), Poly Haven | **CC0** |
 
 No other third-party models, textures, fonts, audio or media are bundled.
 Upstream Hubs UI assets (icons, sounds) remain MPL-2.0 from the Hubs client.
