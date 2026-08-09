@@ -115,7 +115,7 @@ function buildAvatar(v) {
   // --- Head (under Head bone; face is +z) ---
   const headGeo = new THREE.SphereGeometry(0.105, 14, 12);
   headGeo.scale(0.92, 1.08, 0.98);
-  add(head, "Skull", headGeo, skin, 0, 0.075, 0.01);
+  add(head, "Skull", headGeo, v.photo ? hair : skin, 0, 0.075, 0.01);
   if (v.photo) {
     const faceMat = new THREE.MeshStandardMaterial({
       name: `Face_${v.id}`,
@@ -169,10 +169,23 @@ function buildAvatar(v) {
   mouth.name = "Mouth";
   mouth.position.set(0, v.photo ? (v.mouthY ?? 0.044) : 0.028, 0.1);
   head.add(mouth);
-  add(mouth, "MouthMesh", new THREE.BoxGeometry(0.042, 0.011, 0.012), dark, 0, 0, v.photo ? 0.026 : 0);
+  const lipMat = mat(v.lipColor ?? (v.photo ? 0x7a4038 : 0x2a1c18), { roughness: 0.8 });
+  add(
+    mouth,
+    "MouthMesh",
+    new THREE.BoxGeometry(v.photo ? 0.034 : 0.042, v.photo ? 0.006 : 0.011, 0.01),
+    lipMat,
+    0,
+    0,
+    v.photo ? 0.028 : 0
+  );
 
-  // --- Hair (slightly larger on photo avatars so it frames the face) ---
-  const hairY = 0.075, capR = v.photo ? 0.121 : 0.112;
+  // --- Hair (photo avatars: none — the photo carries the hair; the skull
+  // --- behind is tinted the hair colour) ---
+  const hairY = 0.075, capR = 0.112;
+  if (v.photo) {
+    // no geometric hair
+  } else
   if (v.hairStyle === "short") {
     const cap = new THREE.SphereGeometry(capR, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55);
     add(head, "Hair", cap, hair, 0, hairY + 0.005, -0.005);
