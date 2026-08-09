@@ -49,7 +49,13 @@ const VARIANTS = [
   { id: "marigold", skin: 0x6f4530, hair: 0x0f0c0a, hairStyle: "short", shirt: 0xc99a3f },
   { id: "teal", skin: 0xf0c8a4, hair: 0x6e3a22, hairStyle: "long", shirt: 0x3f6e7a },
   { id: "indigo", skin: 0xc68a5c, hair: 0x9a9a94, hairStyle: "short", shirt: 0x3a4a6e },
-  { id: "plum", skin: 0x6f4530, hair: 0x1a1412, hairStyle: "curly", shirt: 0x6e3a5c }
+  { id: "plum", skin: 0x6f4530, hair: 0x1a1412, hairStyle: "curly", shirt: 0x6e3a5c },
+  { id: "slate", skin: 0xf0c8a4, hair: 0xb8b8b2, hairStyle: "short", beard: 0xa8a8a0, shirt: 0x4a5560 },
+  { id: "rust", skin: 0xe8bc94, hair: 0x2a1c12, hairStyle: "bald", beard: 0x2a1c12, shirt: 0x8a4a32 },
+  { id: "forest", skin: 0xf0c8a4, hair: 0x5c4330, hairStyle: "short", glasses: true, shirt: 0x3d5c3a },
+  { id: "wine", skin: 0xc68a5c, hair: 0x1a1210, hairStyle: "long", glasses: true, shirt: 0x7a2e3a },
+  { id: "sand", skin: 0xf0d0ac, hair: 0xc8a86a, hairStyle: "bun", shirt: 0xb89a6a },
+  { id: "night", skin: 0x6f4530, hair: 0x14100c, hairStyle: "bald", glasses: true, shirt: 0x2a3244 }
 ];
 
 function mat(color, opts = {}) {
@@ -136,12 +142,34 @@ function buildAvatar(v) {
     add(head, "Hair", cap, hair, 0, hairY, -0.005);
     const fall = new THREE.CylinderGeometry(0.1, 0.085, 0.24, 10, 1, true);
     add(head, "HairFall", fall, hair, 0, -0.02, -0.035);
+  } else if (v.hairStyle === "bald") {
+    // no hair cap; slight sheen strip
   } else if (v.hairStyle === "curly") {
     const cap = new THREE.SphereGeometry(capR + 0.012, 10, 7, 0, Math.PI * 2, 0, Math.PI * 0.58);
     add(head, "Hair", cap, hair, 0, hairY + 0.01, -0.005);
     add(head, "CurlL", new THREE.SphereGeometry(0.035, 6, 5), hair, 0.08, 0.14, 0.04);
     add(head, "CurlR", new THREE.SphereGeometry(0.035, 6, 5), hair, -0.08, 0.14, 0.04);
     add(head, "CurlT", new THREE.SphereGeometry(0.04, 6, 5), hair, 0, 0.17, -0.02);
+  }
+
+  // --- Beard ---
+  if (v.beard) {
+    const beardMat = mat(v.beard, { roughness: 0.95 });
+    const jaw = new THREE.SphereGeometry(0.095, 10, 7, 0, Math.PI * 2, Math.PI * 0.55, Math.PI * 0.3);
+    add(head, "Beard", jaw, beardMat, 0, 0.052, 0.028);
+    add(head, "Moustache", new THREE.BoxGeometry(0.055, 0.012, 0.014), beardMat, 0, 0.042, 0.102);
+  }
+
+  // --- Glasses ---
+  if (v.glasses) {
+    const gMat = mat(0x1a1a1a, { roughness: 0.4 });
+    for (const sx of [1, -1]) {
+      const rim = new THREE.TorusGeometry(0.026, 0.004, 6, 12);
+      add(head, sx > 0 ? "GlassL" : "GlassR", rim, gMat, sx * 0.042, 0.085, 0.104);
+    }
+    add(head, "GlassBridge", new THREE.BoxGeometry(0.03, 0.005, 0.006), gMat, 0, 0.088, 0.106);
+    add(head, "GlassArmL", new THREE.BoxGeometry(0.004, 0.005, 0.09), gMat, 0.072, 0.085, 0.06);
+    add(head, "GlassArmR", new THREE.BoxGeometry(0.004, 0.005, 0.09), gMat, -0.072, 0.085, 0.06);
   }
 
   // --- Hands: rounded mittens with a thumb hint, skin tone ---
