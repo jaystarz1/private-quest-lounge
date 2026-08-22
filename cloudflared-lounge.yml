@@ -6,6 +6,10 @@ tunnel: a7a1a3b9-0d58-42e9-97c6-f153b3c5c43c
 credentials-file: /Users/jaytarzwell/.cloudflared/a7a1a3b9-0d58-42e9-97c6-f153b3c5c43c.json
 
 ingress:
+  # In-room TV power button → bin/tv-daemon (must precede the main rule)
+  - hostname: lounge.thechatbotgenius.com
+    path: ^/lounge-tv/.*
+    service: http://localhost:9917
   - hostname: lounge.thechatbotgenius.com
     service: https://localhost:4000
     originRequest:

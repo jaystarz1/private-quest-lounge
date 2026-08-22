@@ -32,27 +32,27 @@ const out = process.argv[2] || "lounge.glb";
 // Materials — flat colours only; warmth comes from lighting.
 // ---------------------------------------------------------------------------
 const M = {
-  floor: mat(0x7a5537, { roughness: 0.85 }),
-  logWall: new THREE.MeshStandardMaterial({ name: "LogWall", color: 0xffffff, roughness: 0.92, metalness: 0 }),
-  wall: mat(0xe6dac2, { roughness: 0.95 }),
-  ceiling: mat(0xf0e8d8, { roughness: 0.95 }),
-  trim: mat(0x5c4330, { roughness: 0.8 }),
-  couchA: mat(0x9c4a38, { roughness: 0.9 }), // terracotta
-  couchB: mat(0x4a6351, { roughness: 0.9 }), // sage green
-  cushionA: mat(0xb85c46, { roughness: 0.95 }),
-  cushionB: mat(0x5c7a64, { roughness: 0.95 }),
-  throw1: mat(0xd9a441, { roughness: 0.95 }),
-  throw2: mat(0xc8b89a, { roughness: 0.95 }),
-  wood: mat(0x4e3826, { roughness: 0.7 }),
-  rug: mat(0xa85f42, { roughness: 1.0 }),
-  rugInner: mat(0xc07a52, { roughness: 1.0 }),
+  floor: mat(0x40342a, { roughness: 0.55 }), // dark walnut plank
+  logWall: new THREE.MeshStandardMaterial({ name: "LogWall", color: 0xf1ede4, roughness: 0.95, metalness: 0 }), // warm white plaster (name kept for embed plumbing)
+  wall: mat(0xf1ede4, { roughness: 0.95 }),
+  ceiling: mat(0xf6f4ef, { roughness: 0.95 }),
+  trim: mat(0x23252a, { roughness: 0.45, metalness: 0.4 }), // blackened-steel window frames
+  couchA: mat(0xe6dfd0, { roughness: 0.9 }), // cream boucle
+  couchB: mat(0x393d44, { roughness: 0.9 }), // charcoal
+  cushionA: mat(0xd8d0bd, { roughness: 0.95 }),
+  cushionB: mat(0x4b5058, { roughness: 0.95 }),
+  throw1: mat(0xb98a4e, { roughness: 0.95 }), // camel
+  throw2: mat(0xefe9dc, { roughness: 0.95 }), // ivory
+  wood: mat(0x2c2118, { roughness: 0.5 }),    // black-walnut furniture
+  rug: mat(0xaaa79e, { roughness: 1.0 }),     // pale grey wool
+  rugInner: mat(0xc6c2b8, { roughness: 1.0 }),
   lampShade: new THREE.MeshStandardMaterial({
-    color: 0xffd9a0,
-    emissive: 0xffc98c,
+    color: 0xfff1d8,
+    emissive: 0xffe3b0,
     emissiveIntensity: 1.6,
     roughness: 0.9
   }),
-  lampMetal: mat(0x3a3128, { roughness: 0.5, metalness: 0.6 }),
+  lampMetal: mat(0x8f7a3f, { roughness: 0.35, metalness: 0.85 }), // brushed brass
   nightGlass: new THREE.MeshStandardMaterial({
     color: 0x0a1226,
     emissive: 0x101d3a,
@@ -64,15 +64,20 @@ const M = {
     emissive: 0xf5eeda,
     emissiveIntensity: 2.0
   }),
-  frame: mat(0x2e2620, { roughness: 0.6 }),
-  art1a: mat(0xc46a4a, { roughness: 0.9 }),
-  art1b: mat(0xe0b075, { roughness: 0.9 }),
-  art2a: mat(0x51707e, { roughness: 0.9 }),
-  art2b: mat(0xa8b8a0, { roughness: 0.9 }),
-  book: mat(0x7e3b32, { roughness: 0.9 }),
-  mug: mat(0xdac8a8, { roughness: 0.7 }),
-  plantPot: mat(0xb0603f, { roughness: 0.9 }),
-  plant: mat(0x3f6b3a, { roughness: 0.95 })
+  frame: mat(0x1c1c1f, { roughness: 0.5 }),
+  art1a: mat(0x1f3a5f, { roughness: 0.9 }), // deep navy abstract
+  art1b: mat(0xc8a24b, { roughness: 0.6, metalness: 0.3 }), // gold-leaf accent
+  art2a: mat(0xd8c8bb, { roughness: 0.9 }), // blush/greige abstract
+  art2b: mat(0x6a6f76, { roughness: 0.9 }),
+  book: mat(0x22262e, { roughness: 0.9 }),
+  mug: mat(0xf2efe8, { roughness: 0.7 }),
+  plantPot: mat(0x2e3033, { roughness: 0.8 }),
+  plant: mat(0x3f6b3a, { roughness: 0.95 }),
+  // Kitchen
+  cabinet: mat(0x2b2d30, { roughness: 0.6 }),          // matte graphite fronts
+  marble: mat(0xe9e6df, { roughness: 0.25 }),           // honed white stone
+  steel: mat(0x9ba0a6, { roughness: 0.35, metalness: 0.8 }), // appliance fronts
+  brass: mat(0x8f7a3f, { roughness: 0.35, metalness: 0.85 })
 };
 function mat(color, opts = {}) {
   return new THREE.MeshStandardMaterial({ color, metalness: 0, ...opts });
@@ -111,8 +116,8 @@ function texturedBox(name, w, h, d, material, x, y, z, period) {
 
 // ---------------------------------------------------------------------------
 // Room shell: 12 wide (x, extended to the west) x 10 deep (z) x 3 high.
-// The whole north wall is floor-to-ceiling glass with a Canadian Rockies
-// valley (Moraine Lake, public domain) as the view.
+// Manhattan penthouse: the whole north wall is floor-to-ceiling glass looking
+// out over Central Park (view images cycle via lounge/view-switcher.js).
 // ---------------------------------------------------------------------------
 const X_MIN = -9, X_MAX = 3, Z_MIN = -5, Z_MAX = 5;
 const W = X_MAX - X_MIN, D = Z_MAX - Z_MIN, T = 0.12; // wall thickness
@@ -121,9 +126,9 @@ const H_N = 4.5;    // glass-wall height (5 ft higher); roof slopes up to it
 const CX = (X_MIN + X_MAX) / 2, CZ = (Z_MIN + Z_MAX) / 2;
 const LOG_PERIOD = 1.8; // metres of wall per texture tile (~6 logs)
 box("Floor", W, T, D, M.floor, CX, -T / 2, CZ);
-// Sloped timber roof rising from the south wall (3 m) to the glass wall (4.5 m)
+// Sloped ceiling rising from the south wall (3 m) to the glass wall (4.5 m)
 const slope = Math.atan((H_N - H) / D);
-const roof = box("Roof", W, T, D / Math.cos(slope) + 0.2, mat(0x8a6242, { roughness: 0.85 }), CX, (H + H_N) / 2 + T / 2, CZ);
+const roof = box("Roof", W, T, D / Math.cos(slope) + 0.2, M.ceiling, CX, (H + H_N) / 2 + T / 2, CZ);
 roof.rotation.x = slope;
 // Log walls (east/west run full height; the roof hides their tops)
 texturedBox("Wall_East", T, H_N, D, M.logWall, X_MAX + T / 2, H_N / 2, CZ, LOG_PERIOD);
@@ -190,7 +195,7 @@ cyl("Mug2", 0.04, 0.035, 0.09, M.mug, 0.18, tbl.h + 0.07, -0.14);
 // ---------------------------------------------------------------------------
 // Two couches facing each other across the table (couch A faces -z, B faces +z)
 // ---------------------------------------------------------------------------
-function couch(tag, z, facing, bodyMat, cushMat, throwMat) {
+function couch(tag, z, facing, bodyMat, cushMat, throwMat, x = 0, rotY = 0) {
   // facing = -1 → looks toward -z (couch sits at +z)
   const g = new THREE.Group();
   g.name = `Couch_${tag}`;
@@ -219,12 +224,17 @@ function couch(tag, z, facing, bodyMat, cushMat, throwMat) {
   pil.position.set(-cw / 2 + 0.32, 0.6, facing * -1 * (cd / 2 - 0.3));
   pil.rotation.z = 0.5;
   g.add(pil);
-  g.position.set(0, 0, z);
+  g.position.set(x, 0, z);
+  g.rotation.y = rotY;
   scene.add(g);
   return { seatH, cushionX: [-0.44, 0.44], z };
 }
 const couchA = couch("A", 1.55, -1, M.couchA, M.cushionA, M.throw1); // faces the window
 const couchB = couch("B", -1.55, 1, M.couchB, M.cushionB, M.throw2);
+// TV couch: west end, rotated to face the wall TV (-x). Local -z maps to -x.
+couch("C", 0, -1, M.couchA, M.cushionA, M.throw2, -4.6, Math.PI / 2);
+// World-space cushion centers for couch C (local ±0.44 x, -0.06 z, rotated 90°)
+const couchC = { cushions: [[-4.66, 0.44], [-4.66, -0.44]] };
 
 // ---------------------------------------------------------------------------
 // Floor lamps (emissive shades; real lights injected as hubs point-lights)
@@ -239,8 +249,6 @@ function lamp(tag, x, z) {
   anchor.position.set(x, 1.45, z);
   scene.add(anchor);
 }
-lamp("L", -2.45, -1.9);
-lamp("R", 2.45, 1.9);
 lamp("C", -6.6, -3.9);
 lamp("D", -6.6, 3.9);
 
@@ -266,41 +274,214 @@ function art(tag, x, z, ry, a, b) {
   g.rotation.y = ry;
   scene.add(g);
 }
-art("East", X_MAX - 0.03, 0.4, -Math.PI / 2, M.art1a, M.art1b);
-art("West", X_MIN + 0.03, -0.4, Math.PI / 2, M.art2a, M.art2b);
+art("East", X_MAX - 0.03, -1.0, -Math.PI / 2, M.art1a, M.art1b); // north of the fridge
+art("West", X_MIN + 0.03, -3.0, Math.PI / 2, M.art2a, M.art2b); // shifted for the TV
+
+// ---------------------------------------------------------------------------
+// Wall TV (west wall, faces the dining table and the couches beyond).
+// The dark "TVScreen" plane is the pin target: lounge/tv.js snaps any
+// screen-share video object onto it.
+// ---------------------------------------------------------------------------
+const TV = { w: 3.2, h: 1.8, cy: 1.6, cz: 0 };
+box("TV_Frame", 0.08, TV.h + 0.12, TV.w + 0.12, mat(0x1a1a1a, { roughness: 0.4 }), X_MIN + 0.06, TV.cy, TV.cz);
+{
+  const scr = new THREE.Mesh(
+    new THREE.PlaneGeometry(TV.w, TV.h),
+    new THREE.MeshStandardMaterial({ color: 0x05070a, roughness: 0.3, metalness: 0.1 })
+  );
+  scr.name = "TVScreen";
+  scr.position.set(X_MIN + 0.11, TV.cy, TV.cz);
+  scr.rotation.y = Math.PI / 2; // face +x, into the room
+  scene.add(scr);
+}
 
 // Plant in the corner
 cyl("Plant_Pot", 0.16, 0.12, 0.28, M.plantPot, 2.5, 0.14, -2.0);
 cyl("Plant_Leaves", 0.02, 0.28, 0.75, M.plant, 2.5, 0.75, -2.0, 8);
 
 // ---------------------------------------------------------------------------
-// Nav mesh: walkable floor minus furniture footprints. Single merged mesh.
-// Rectangles: [x1, z1, x2, z2]
+// Kitchen (east wall): graphite cabinet run + marble tops, fridge at the north
+// end, marble island with three brass stools facing the kitchen. Stools are
+// seat waypoints (Seat_S1..S3) with floor-level nav islands like the chairs.
 // ---------------------------------------------------------------------------
-const walkRects = [
-  [-8.85, -4.85, 2.85, -2.05], // north area (by the glass wall)
-  [-8.85, 2.05, 2.85, 4.85],   // south area
-  [-8.85, -2.05, -1.15, 2.05], // western extension
-  [1.15, -2.05, 2.85, 2.05],   // east corridor
-  [-1.15, -1.05, 1.15, -0.45], // between couch B and table
-  [-1.15, 0.45, 1.15, 1.05]    // between table and couch A
+const KIT = { cx: 2.65, z1: 1.35, z2: 4.6 };
+{
+  const len = KIT.z2 - KIT.z1, zc = (KIT.z1 + KIT.z2) / 2;
+  box("Kitchen_Base", 0.7, 0.86, len, M.cabinet, KIT.cx, 0.43, zc);
+  box("Kitchen_Top", 0.76, 0.04, len + 0.06, M.marble, KIT.cx, 0.9, zc);
+  box("Kitchen_Splash", 0.02, 0.6, len, M.marble, X_MAX - 0.02, 1.22, zc);
+  box("Kitchen_Uppers", 0.35, 0.7, len - 0.4, M.cabinet, X_MAX - 0.185, 2.0, zc);
+  // Cooktop + brass faucet
+  box("Kitchen_Cooktop", 0.55, 0.015, 0.5, mat(0x0c0d10, { roughness: 0.3 }), KIT.cx - 0.02, 0.925, 3.6);
+  cyl("Kitchen_Faucet", 0.018, 0.018, 0.3, M.brass, X_MAX - 0.18, 1.05, 2.2, 10);
+  // Fridge (north end of the run, integrated panel look)
+  box("Kitchen_Fridge", 0.78, 2.05, 0.75, M.steel, 2.6, 1.025, 0.9);
+  box("Kitchen_FridgeHandle", 0.02, 0.9, 0.03, M.brass, 2.2, 1.2, 0.58);
+}
+// Island — kept south of couch A (couch A footprint reaches z ≈ 1.97)
+const ISL = { x: 1.3, z: 3.4, w: 0.95, len: 2.0 };
+box("Island_Base", ISL.w - 0.12, 0.86, ISL.len - 0.12, M.cabinet, ISL.x, 0.43, ISL.z);
+box("Island_Top", ISL.w, 0.04, ISL.len + 0.1, M.marble, ISL.x, 0.9, ISL.z);
+// Stools (west side, facing the kitchen: +x)
+const STOOLS = [
+  ["S1", 0.55, 2.7],
+  ["S2", 0.55, 3.4],
+  ["S3", 0.55, 4.1]
 ];
-const navGeoms = walkRects.map(([x1, z1, x2, z2]) => {
-  const gm = new THREE.PlaneGeometry(x2 - x1, z2 - z1);
-  gm.rotateX(-Math.PI / 2);
-  gm.translate((x1 + x2) / 2, 0.002, (z1 + z2) / 2);
-  return gm;
-});
+for (const [tag, sx, sz] of STOOLS) {
+  cyl(`Stool_${tag}_Base`, 0.14, 0.16, 0.03, M.brass, sx, 0.015, sz);
+  cyl(`Stool_${tag}_Pole`, 0.022, 0.022, 0.56, M.brass, sx, 0.31, sz, 10);
+  cyl(`Stool_${tag}_Seat`, 0.17, 0.17, 0.05, M.wood, sx, 0.62, sz, 16);
+}
+// Pendant globes over the island (emissive only — no extra dynamic lights).
+// Stems run from the globe up to the sloped ceiling at that z.
+for (const [i, pz] of [[0, 2.8], [1, 3.4], [2, 4.0]]) {
+  const ceilY = H + (H_N - H) * (Z_MAX - pz) / D;
+  const stemH = ceilY - 2.29;
+  cyl(`Pendant${i}_Stem`, 0.008, 0.008, stemH, M.brass, ISL.x, 2.29 + stemH / 2, pz, 8);
+  const globe = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 12), M.lampShade);
+  globe.name = `Pendant${i}_Globe`;
+  globe.position.set(ISL.x, 2.2, pz);
+  scene.add(globe);
+}
+
+// ---------------------------------------------------------------------------
+// TV couch (west end): faces the wall TV across the room. Same seat mechanism
+// as the other couches. Built at origin facing local -z, rotated to face -x.
+// ---------------------------------------------------------------------------
+const SEAT_H = 0.45;
+function chair(tag, cx, cz, yaw) {
+  const g = new THREE.Group();
+  g.name = `Chair_${tag}`;
+  const add = (name, w, h, d, m, x, y, z) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+    mesh.name = `Chair_${tag}_${name}`;
+    mesh.position.set(x, y, z);
+    g.add(mesh);
+  };
+  add("Seat", 0.46, 0.06, 0.44, M.cushionB, 0, SEAT_H - 0.03, 0);
+  for (const [i, [lx, lz]] of [[-1, -1], [1, -1], [-1, 1], [1, 1]].entries()) {
+    add(`Leg${i}`, 0.045, SEAT_H - 0.06, 0.045, M.wood, lx * 0.19, (SEAT_H - 0.06) / 2, lz * 0.18);
+  }
+  add("Back", 0.46, 0.5, 0.05, M.wood, 0, SEAT_H + 0.28, -0.21);
+  // group +z is the sitting direction; back sits behind (-z), then yaw
+  g.position.set(cx, 0, cz);
+  g.rotation.y = yaw;
+  scene.add(g);
+}
+
+// ---------------------------------------------------------------------------
+// Work desk (south-west corner): desk against the south wall, two chairs side
+// by side, monitor on top. The monitor mirrors the wall-TV share up close so
+// seated text is legible (lounge/tv.js shares the video material).
+// ---------------------------------------------------------------------------
+const DESK = { x: -7.5, z: 4.45, w: 1.6, d: 0.7, h: 0.74 };
+box("Desk_Top", DESK.w, 0.05, DESK.d, M.wood, DESK.x, DESK.h, DESK.z);
+for (const [i, [lx, lz]] of [[-1, -1], [1, -1], [-1, 1], [1, 1]].entries()) {
+  box(`Desk_Leg${i}`, 0.06, DESK.h, 0.06, M.wood,
+    DESK.x + lx * (DESK.w / 2 - 0.08), DESK.h / 2, DESK.z + lz * (DESK.d / 2 - 0.1));
+}
+// Monitor: 16:9 panel on a stand, facing the chairs (-z)
+box("Monitor_Stand", 0.06, 0.12, 0.18, M.lampMetal, DESK.x, DESK.h + 0.085, DESK.z + 0.12);
+box("Monitor_Frame", 1.12, 0.66, 0.03, mat(0x1a1a1a, { roughness: 0.4 }), DESK.x, DESK.h + 0.52, DESK.z + 0.14);
+{
+  const mon = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.06, 0.6),
+    new THREE.MeshStandardMaterial({ color: 0x05070a, roughness: 0.3, metalness: 0.1 })
+  );
+  mon.name = "MonitorScreen";
+  mon.position.set(DESK.x, DESK.h + 0.52, DESK.z + 0.122);
+  mon.rotation.y = Math.PI; // face -z, toward the chairs
+  scene.add(mon);
+}
+const DESK_CHAIRS = [
+  ["K1", DESK.x - 0.4, DESK.z - 0.73, 0],
+  ["K2", DESK.x + 0.4, DESK.z - 0.73, 0]
+];
+for (const [tag, cx, cz, yaw] of DESK_CHAIRS) chair(tag, cx, cz, yaw);
+
+// ---------------------------------------------------------------------------
+// Nav mesh: one welded triangulated grid over the whole floor, cells dropped
+// inside furniture footprints. Abutting separate rectangles do NOT count as
+// connected in three-pathfinding (neighbors need a shared edge, i.e. two
+// shared vertices), which stranded players on isolated patches. A grid built
+// from a single shared vertex lattice is connected by construction.
+// ---------------------------------------------------------------------------
+const NAV = { x1: -8.85, z1: -4.85, x2: 2.85, z2: 4.85, res: 0.2 };
+// Blocked footprints [x1, z1, x2, z2] (slightly expanded past the geometry)
+const blocked = [
+  [-1.15, 1.05, 1.15, 2.05],   // couch A
+  [-1.15, -2.05, 1.15, -1.05], // couch B
+  [-0.7, -0.45, 0.7, 0.45],    // coffee table
+  [-6.8, -4.1, -6.4, -3.7],    // lamp C
+  [-6.8, 3.7, -6.4, 4.1],      // lamp D
+  [2.28, -2.22, 2.72, -1.78],  // plant
+  [-5.2, -1.1, -4.05, 1.1],    // TV couch (couch C)
+  [-8.4, 4.0, -6.6, 4.85],     // desk
+  [-8.18, 3.48, -7.62, 3.98],  // desk chair K1
+  [-7.38, 3.48, -6.82, 3.98],  // desk chair K2
+  [2.2, 0.4, 2.9, 4.85],       // kitchen run + fridge (east wall)
+  [0.75, 2.3, 1.85, 4.5],      // island
+  [0.35, 2.5, 0.75, 2.9],      // stool S1
+  [0.35, 3.2, 0.75, 3.6],      // stool S2
+  [0.35, 3.9, 0.75, 4.3]       // stool S3
+];
+const inBlocked = (x, z) => blocked.some(([a, b, c, d]) => x > a && x < c && z > b && z < d);
+const navGeoms = [];
+{
+  const nx = Math.round((NAV.x2 - NAV.x1) / NAV.res);
+  const nz = Math.round((NAV.z2 - NAV.z1) / NAV.res);
+  const dx = (NAV.x2 - NAV.x1) / nx;
+  const dz = (NAV.z2 - NAV.z1) / nz;
+  const vIndex = new Map(); // lattice (i,j) -> vertex index, shared across cells
+  const pos = [];
+  const idx = [];
+  const vert = (i, j) => {
+    const k = i * (nz + 1) + j;
+    let v = vIndex.get(k);
+    if (v === undefined) {
+      v = pos.length / 3;
+      vIndex.set(k, v);
+      pos.push(NAV.x1 + i * dx, 0.002, NAV.z1 + j * dz);
+    }
+    return v;
+  };
+  for (let i = 0; i < nx; i++) {
+    for (let j = 0; j < nz; j++) {
+      const cx = NAV.x1 + (i + 0.5) * dx;
+      const cz = NAV.z1 + (j + 0.5) * dz;
+      if (inBlocked(cx, cz)) continue;
+      const a = vert(i, j), b = vert(i + 1, j), c = vert(i + 1, j + 1), d = vert(i, j + 1);
+      idx.push(a, c, b, a, d, c); // ccw viewed from above (+y)
+    }
+  }
+  const gm = new THREE.BufferGeometry();
+  gm.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  const uvs = [];
+  for (let v = 0; v < pos.length; v += 3) {
+    uvs.push((pos[v] - NAV.x1) / (NAV.x2 - NAV.x1), (pos[v + 2] - NAV.z1) / (NAV.z2 - NAV.z1));
+  }
+  gm.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  gm.setIndex(idx);
+  gm.computeVertexNormals();
+  navGeoms.push(gm);
+}
 // Cushion tops are teleportable islands: you can point-and-teleport straight
 // onto a couch seat. (Seat waypoints land here via shouldLandWhenPossible.)
 const CUSHION_TOP = 0.45;
-for (const [cx, cz] of [
+for (const [cx, cz, w, d] of [
   [-0.44, couchA.z + 0.06], [0.44, couchA.z + 0.06],
-  [-0.44, couchB.z - 0.06], [0.44, couchB.z - 0.06]
+  [-0.44, couchB.z - 0.06], [0.44, couchB.z - 0.06],
+  ...couchC.cushions.map(([cx2, cz2]) => [cx2, cz2, 0.5, 0.72]), // TV couch (rotated)
+  ...DESK_CHAIRS.map(([, cx2, cz2]) => [cx2, cz2, 0.4, 0.4]), // desk chair seats
+  ...STOOLS.map(([, sx, sz]) => [sx, sz, 0.4, 0.4]) // kitchen stool seats
 ]) {
-  const gm = new THREE.PlaneGeometry(0.72, 0.5);
+  const gm = new THREE.PlaneGeometry(w || 0.72, d || 0.5);
   gm.rotateX(-Math.PI / 2);
-  gm.translate(cx, CUSHION_TOP + 0.005, cz);
+  // Land at FLOOR level inside the seat footprint: a physically-seated player
+  // (real HMD at sitting height) then reads as seated in the couch/chair.
+  // Cushion-height islands put avatars standing ON the cushions ("hovering").
+  gm.translate(cx, 0.002, cz);
   navGeoms.push(gm);
 }
 const navMesh = new THREE.Mesh(mergeGeometries(navGeoms), mat(0x00ff00));
@@ -330,6 +511,13 @@ empty("Seat_A1", couchA.cushionX[0], SEAT_Y, couchA.z + 0.06, Math.PI); // couch
 empty("Seat_A2", couchA.cushionX[1], SEAT_Y, couchA.z + 0.06, Math.PI);
 empty("Seat_B1", couchB.cushionX[0], SEAT_Y, couchB.z - 0.06, 0);
 empty("Seat_B2", couchB.cushionX[1], SEAT_Y, couchB.z - 0.06, 0);
+// TV couch waypoints: face the wall TV (-x → yaw -PI/2)
+empty("Seat_C1", couchC.cushions[0][0], SEAT_Y, couchC.cushions[0][1], -Math.PI / 2);
+empty("Seat_C2", couchC.cushions[1][0], SEAT_Y, couchC.cushions[1][1], -Math.PI / 2);
+// Desk chair waypoints: icon floats above the seat, avatar faces the monitor.
+for (const [tag, cx, cz, yaw] of DESK_CHAIRS) empty(`Seat_${tag}`, cx, 0.6, cz, yaw);
+// Kitchen stool waypoints: avatar faces the island/kitchen (+x → yaw PI/2).
+for (const [tag, sx, sz] of STOOLS) empty(`Seat_${tag}`, sx, 0.8, sz, Math.PI / 2);
 empty("AmbientLight", CX, H - 0.4, 0);
 
 // ---------------------------------------------------------------------------
@@ -369,8 +557,13 @@ const HUBS_COMPONENTS = {
   Seat_A2: seatWaypoint("seat-a2"),
   Seat_B1: seatWaypoint("seat-b1"),
   Seat_B2: seatWaypoint("seat-b2"),
-  LampL_Light: pointLight(1.4, 7),
-  LampR_Light: pointLight(1.4, 7),
+  Seat_C1: seatWaypoint("seat-c1"),
+  Seat_C2: seatWaypoint("seat-c2"),
+  Seat_K1: seatWaypoint("seat-k1"),
+  Seat_K2: seatWaypoint("seat-k2"),
+  Seat_S1: seatWaypoint("seat-s1"),
+  Seat_S2: seatWaypoint("seat-s2"),
+  Seat_S3: seatWaypoint("seat-s3"),
   LampC_Light: pointLight(1.4, 7),
   LampD_Light: pointLight(1.4, 7),
   AmbientLight: { "ambient-light": { color: "#ffe2c4", intensity: 0.55 } }
@@ -390,14 +583,13 @@ const json = JSON.parse(buf.subarray(20, 20 + jsonLen).toString("utf8"));
 let binChunk = buf.subarray(20 + jsonLen); // includes its 8-byte chunk header
 
 // --- Embed photo textures into the GLB binary chunk:
-// ---  * Rockies view (Moraine Lake, public domain) -> emissive backdrop
-// ---  * Log wall (Poly Haven beam_wall_01, CC0, warmed) -> tiling base colour
+// ---  * Central Park view (Top of the Rock, CC BY 2.0) -> emissive backdrop
+// ---    placeholder; view-switcher.js swaps in the full-res views at runtime.
 {
   const { readFileSync } = await import("fs");
   const REPEAT = 10497, CLAMP = 33071;
   const EMBEDS = [
-    { file: "./rockies-wide.jpg", material: "RockiesBackdrop", slot: "emissive", wrap: CLAMP },
-    { file: "./logwall.jpg", material: "LogWall", slot: "base", wrap: REPEAT }
+    { file: "./centralpark-wide.jpg", material: "RockiesBackdrop", slot: "emissive", wrap: CLAMP }
   ];
 
   let binData = Buffer.from(binChunk.subarray(8, 8 + binChunk.readUInt32LE(0)));

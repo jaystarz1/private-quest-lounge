@@ -4,11 +4,23 @@
 # lounge.thechatbotgenius.com       -> reticulum :4000  (pages, API, presence WSS)
 # lounge-app.thechatbotgenius.com   -> hubs-client :8080 (webpack assets)
 # lounge-voice.thechatbotgenius.com -> dialog :4443      (protoo signaling WSS)
-# Voice MEDIA is direct UDP/TCP 40000-40050 to this machine's public IP —
+# Voice MEDIA is direct UDP/TCP 40000-40031 to this machine's public IP.
 # requires a router port-forward; announced IP comes from PUBLIC_MEDIA_IP.
+x-log-policy: &log-policy
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "3"
+
 services:
+  db:
+    logging: *log-policy
+    restart: unless-stopped
   reticulum:
+    logging: *log-policy
+    restart: unless-stopped
     environment:
+      PUBLIC_RUNTIME: "true"
       RET_HOST: ${PUBLIC_HOST:-lounge.thechatbotgenius.com}
       RET_PUBLIC_PORT: "443"
       RET_PUBLIC_ASSETS_HOST: ${PUBLIC_ASSETS_HOST:-lounge-app.thechatbotgenius.com}
@@ -21,13 +33,36 @@ services:
       SMTP_USERNAME: ${LOUNGE_SMTP_USERNAME:-resend}
       SMTP_PASSWORD: ${LOUNGE_SMTP_PASSWORD}
       SMTP_FROM: ${LOUNGE_SMTP_FROM:-lounge@send.hushhollow.ca}
+    healthcheck:
+      test: ["CMD", "wget", "--no-check-certificate", "-q", "-O", "/dev/null", "https://127.0.0.1:4000/"]
   hubs-client:
+    command: npm run serve:public
+    logging: *log-policy
+    restart: unless-stopped
     environment:
+      BASE_ASSETS_PATH: https://${PUBLIC_ASSETS_HOST:-lounge-app.thechatbotgenius.com}/
+      CORS_PROXY_SERVER: ${PUBLIC_HOST:-lounge.thechatbotgenius.com}/cors-proxy
+      HOST: ${PUBLIC_HOST:-lounge.thechatbotgenius.com}
+      NON_CORS_PROXY_DOMAINS: ${PUBLIC_HOST:-lounge.thechatbotgenius.com},${PUBLIC_ASSETS_HOST:-lounge-app.thechatbotgenius.com}
+      POSTGREST_SERVER: ""
       PUBLIC_HOST: ${PUBLIC_HOST:-lounge.thechatbotgenius.com}
       PUBLIC_ASSETS_HOST: ${PUBLIC_ASSETS_HOST:-lounge-app.thechatbotgenius.com}
+      RETICULUM_SERVER: ${PUBLIC_HOST:-lounge.thechatbotgenius.com}
+      RETICULUM_SOCKET_SERVER: ${PUBLIC_HOST:-lounge.thechatbotgenius.com}
+      UPLOADS_HOST: https://${PUBLIC_HOST:-lounge.thechatbotgenius.com}
       LOUNGE_PIN: ${LOUNGE_PIN:-246810}
       LOUNGE_ROOM_PATH: ${LOUNGE_ROOM_PATH:-/FxjfVW8/the-lounge}
+    healthcheck:
+      start_period: 6m
+      test: ["CMD", "curl", "-fk", "https://localhost:8080"]
+  hubs-admin:
+    profiles: ["admin"]
   dialog:
+    logging: *log-policy
+    restart: unless-stopped
     environment:
       MEDIASOUP_ANNOUNCED_IP: ${PUBLIC_MEDIA_IP}
       MEDIASOUP_ANNOUNCED_IP_LAN: ${LAN_MEDIA_IP}
+  postgrest:
+    logging: *log-policy
+    restart: unless-stopped

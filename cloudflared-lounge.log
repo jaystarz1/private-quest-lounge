@@ -1,105 +1,120 @@
-2026-08-09T01:33:24Z INF Starting tunnel tunnelID=a7a1a3b9-0d58-42e9-97c6-f153b3c5c43c
-2026-08-09T01:33:24Z INF Version 2026.7.2 (Checksum c647bfd58ab7fa562d47061853321eb78b7205b110a45fff8f3c53196f3986a5)
-2026-08-09T01:33:24Z INF GOOS: darwin, GOVersion: go1.26.5, GoArch: arm64
-2026-08-09T01:33:24Z INF Settings: map[config:/Users/jaytarzwell/VR Meet Up/private-quest-lounge/cloudflared-lounge.yml cred-file:/Users/jaytarzwell/.cloudflared/a7a1a3b9-0d58-42e9-97c6-f153b3c5c43c.json credentials-file:/Users/jaytarzwell/.cloudflared/a7a1a3b9-0d58-42e9-97c6-f153b3c5c43c.json]
-2026-08-09T01:33:24Z INF cloudflared will not automatically update if installed by a package manager.
-2026-08-09T01:33:24Z INF Generated Connector ID: d56aac81-fc74-41e9-b2aa-62d1259f6136
-2026-08-09T01:33:24Z INF Initial protocol quic
-2026-08-09T01:33:24Z INF ICMP proxy will use 10.0.0.29 as source for IPv4
-2026-08-09T01:33:24Z INF ICMP proxy will use fe80::45:fb04:70c0:e1d2 in zone en1 as source for IPv6
-2026-08-09T01:33:24Z INF Created ICMP proxy listening on 10.0.0.29:0
-2026-08-09T01:33:24Z INF ICMP proxy will use 10.0.0.29 as source for IPv4
-2026-08-09T01:33:24Z INF ICMP proxy will use fe80::45:fb04:70c0:e1d2 in zone en1 as source for IPv6
-2026-08-09T01:33:24Z INF Starting metrics server on 127.0.0.1:20241/metrics
-2026-08-09T01:33:24Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=2606:4700:a8::7
-2026-08-09T01:33:24Z INF Registered tunnel connection connIndex=0 connection=18091d3c-8e37-4719-81e8-8b48795e9322 event=0 ip=2606:4700:a8::7 location=yyz06 protocol=quic
-2026-08-09T01:33:24Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=1 event=0 ip=2606:4700:a0::5
-2026-08-09T01:33:24Z INF Registered tunnel connection connIndex=1 connection=45c5985e-1dd5-45ac-8977-43f4a7ab2960 event=0 ip=2606:4700:a0::5 location=yul01 protocol=quic
-2026-08-09T01:33:24Z INF +-------------------------------------------------------------------------------------+
-2026-08-09T01:33:24Z INF |                               CONNECTIVITY PRE-CHECKS                               |
-2026-08-09T01:33:24Z INF +-------------------------------------------------------------------------------------+
-2026-08-09T01:33:24Z INF |  COMPONENT         TARGET                     STATUS  DETAILS                       |
-2026-08-09T01:33:24Z INF |  DNS Resolution    region1.v2.argotunnel.com  PASS    DNS Resolved successfully     |
-2026-08-09T01:33:24Z INF |  DNS Resolution    region2.v2.argotunnel.com  PASS    DNS Resolved successfully     |
-2026-08-09T01:33:24Z INF |  UDP Connectivity  region1.v2.argotunnel.com  PASS    QUIC connection successful    |
-2026-08-09T01:33:24Z INF |  UDP Connectivity  region2.v2.argotunnel.com  PASS    QUIC connection successful    |
-2026-08-09T01:33:24Z INF |  TCP Connectivity  region1.v2.argotunnel.com  PASS    HTTP/2 connection successful  |
-2026-08-09T01:33:24Z INF |  TCP Connectivity  region2.v2.argotunnel.com  PASS    HTTP/2 connection successful  |
-2026-08-09T01:33:24Z INF |  Cloudflare API    api.cloudflare.com:443     PASS    API is reachable              |
-2026-08-09T01:33:24Z INF |                                                                                     |
-2026-08-09T01:33:24Z INF |  SUMMARY: Environment is healthy. cloudflared will use 'quic' as primary protocol.  |
-2026-08-09T01:33:24Z INF +-------------------------------------------------------------------------------------+
-2026-08-09T01:33:24Z INF precheck component="DNS Resolution" details="DNS Resolved successfully" run_id=3e2d248b-4f4b-40ac-a25b-9f0b83eb7320 status=pass target=region1.v2.argotunnel.com
-2026-08-09T01:33:24Z INF precheck component="DNS Resolution" details="DNS Resolved successfully" run_id=3e2d248b-4f4b-40ac-a25b-9f0b83eb7320 status=pass target=region2.v2.argotunnel.com
-2026-08-09T01:33:24Z INF precheck component="UDP Connectivity" details="QUIC connection successful" run_id=3e2d248b-4f4b-40ac-a25b-9f0b83eb7320 status=pass target=region1.v2.argotunnel.com
-2026-08-09T01:33:24Z INF precheck component="UDP Connectivity" details="QUIC connection successful" run_id=3e2d248b-4f4b-40ac-a25b-9f0b83eb7320 status=pass target=region2.v2.argotunnel.com
-2026-08-09T01:33:24Z INF precheck component="TCP Connectivity" details="HTTP/2 connection successful" run_id=3e2d248b-4f4b-40ac-a25b-9f0b83eb7320 status=pass target=region1.v2.argotunnel.com
-2026-08-09T01:33:24Z INF precheck component="TCP Connectivity" details="HTTP/2 connection successful" run_id=3e2d248b-4f4b-40ac-a25b-9f0b83eb7320 status=pass target=region2.v2.argotunnel.com
-2026-08-09T01:33:24Z INF precheck component="Cloudflare API" details="API is reachable" run_id=3e2d248b-4f4b-40ac-a25b-9f0b83eb7320 status=pass target=api.cloudflare.com:443
-2026-08-09T01:33:24Z INF precheck complete hard_fail=false run_id=3e2d248b-4f4b-40ac-a25b-9f0b83eb7320 suggested_protocol=quic
-2026-08-09T01:33:25Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=2 event=0 ip=2606:4700:a8::8
-2026-08-09T01:33:25Z INF Registered tunnel connection connIndex=2 connection=18e651d5-d274-4fb7-8da9-e9b4b9d09f3c event=0 ip=2606:4700:a8::8 location=yyz04 protocol=quic
-2026-08-09T01:33:26Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=3 event=0 ip=2606:4700:a0::1
-2026-08-09T01:33:26Z INF Registered tunnel connection connIndex=3 connection=623738ce-4477-441f-b028-6480db327c20 event=0 ip=2606:4700:a0::1 location=yul01 protocol=quic
-2026-08-09T01:34:03Z ERR  error="stream 9 canceled by remote with error code 0" connIndex=1 event=1 ingressRule=1 originService=https://localhost:8080
-2026-08-09T01:34:03Z ERR Request failed error="stream 9 canceled by remote with error code 0" connIndex=1 dest=https://lounge-app.thechatbotgenius.com/ event=0 ip=2606:4700:a0::5 type=http
-2026-08-09T01:44:35Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp [::1]:4000: connect: connection refused" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:44:35Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp [::1]:4000: connect: connection refused" connIndex=1 dest=https://lounge.thechatbotgenius.com/socket/websocket?vsn=2.0.0 event=0 ip=2606:4700:a0::5 type=ws
-2026-08-09T01:44:35Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59618->[::1]:4000: read: connection reset by peer" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:44:35Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59618->[::1]:4000: read: connection reset by peer" connIndex=1 dest=https://lounge.thechatbotgenius.com/api/v1/meta event=0 ip=2606:4700:a0::5 type=http
-2026-08-09T01:44:35Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59619->[::1]:4000: read: connection reset by peer" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:44:35Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59619->[::1]:4000: read: connection reset by peer" connIndex=1 dest=https://lounge.thechatbotgenius.com/phoenix/live_reload/socket/websocket?vsn=2.0.0 event=0 ip=2606:4700:a0::5 type=ws
-2026-08-09T01:44:36Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59621->[::1]:4000: read: connection reset by peer" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:44:36Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59621->[::1]:4000: read: connection reset by peer" connIndex=1 dest=https://lounge.thechatbotgenius.com/socket/websocket?vsn=2.0.0 event=0 ip=2606:4700:a0::5 type=ws
-2026-08-09T01:44:36Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: EOF" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:44:36Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: EOF" connIndex=1 dest=https://lounge.thechatbotgenius.com/api/v1/meta event=0 ip=2606:4700:a0::5 type=http
-2026-08-09T01:44:36Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59624->[::1]:4000: read: connection reset by peer" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:44:36Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59624->[::1]:4000: read: connection reset by peer" connIndex=1 dest=https://lounge.thechatbotgenius.com/phoenix/live_reload/socket/websocket?vsn=2.0.0 event=0 ip=2606:4700:a0::5 type=ws
-2026-08-09T01:44:37Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59626->[::1]:4000: read: connection reset by peer" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:44:37Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59626->[::1]:4000: read: connection reset by peer" connIndex=1 dest=https://lounge.thechatbotgenius.com/socket/websocket?vsn=2.0.0 event=0 ip=2606:4700:a0::5 type=ws
-2026-08-09T01:44:37Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59628->[::1]:4000: read: connection reset by peer" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:44:37Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59628->[::1]:4000: read: connection reset by peer" connIndex=1 dest=https://lounge.thechatbotgenius.com/api/v1/meta event=0 ip=2606:4700:a0::5 type=http
-2026-08-09T01:44:37Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59629->[::1]:4000: read: connection reset by peer" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:44:37Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59629->[::1]:4000: read: connection reset by peer" connIndex=1 dest=https://lounge.thechatbotgenius.com/phoenix/live_reload/socket/websocket?vsn=2.0.0 event=0 ip=2606:4700:a0::5 type=ws
-2026-08-09T01:44:38Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59634->[::1]:4000: read: connection reset by peer" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:44:38Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59634->[::1]:4000: read: connection reset by peer" connIndex=1 dest=https://lounge.thechatbotgenius.com/socket/websocket?vsn=2.0.0 event=0 ip=2606:4700:a0::5 type=ws
-2026-08-09T01:44:38Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59636->[::1]:4000: read: connection reset by peer" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:44:38Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59636->[::1]:4000: read: connection reset by peer" connIndex=1 dest=https://lounge.thechatbotgenius.com/api/v1/meta event=0 ip=2606:4700:a0::5 type=http
-2026-08-09T01:44:38Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59637->[::1]:4000: read: connection reset by peer" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:44:38Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59637->[::1]:4000: read: connection reset by peer" connIndex=1 dest=https://lounge.thechatbotgenius.com/phoenix/live_reload/socket/websocket?vsn=2.0.0 event=0 ip=2606:4700:a0::5 type=ws
-2026-08-09T01:48:37Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59971->[::1]:4000: read: connection reset by peer" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:48:37Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59971->[::1]:4000: read: connection reset by peer" connIndex=1 dest=https://lounge.thechatbotgenius.com/phoenix/live_reload/socket/websocket?vsn=2.0.0 event=0 ip=2606:4700:a0::5 type=ws
-2026-08-09T01:48:38Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59973->[::1]:4000: read: connection reset by peer" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:48:38Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59973->[::1]:4000: read: connection reset by peer" connIndex=1 dest=https://lounge.thechatbotgenius.com/socket/websocket?vsn=2.0.0 event=0 ip=2606:4700:a0::5 type=ws
-2026-08-09T01:48:38Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59977->[::1]:4000: read: connection reset by peer" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:48:38Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59977->[::1]:4000: read: connection reset by peer" connIndex=1 dest=https://lounge.thechatbotgenius.com/api/v1/meta event=0 ip=2606:4700:a0::5 type=http
-2026-08-09T01:48:38Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: EOF" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:48:38Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: EOF" connIndex=1 dest=https://lounge.thechatbotgenius.com/phoenix/live_reload/socket/websocket?vsn=2.0.0 event=0 ip=2606:4700:a0::5 type=ws
-2026-08-09T01:48:38Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: EOF" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:48:38Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: EOF" connIndex=1 dest=https://lounge.thechatbotgenius.com/socket/websocket?vsn=2.0.0 event=0 ip=2606:4700:a0::5 type=ws
-2026-08-09T01:48:38Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: EOF" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:48:38Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: EOF" connIndex=1 dest=https://lounge.thechatbotgenius.com/api/v1/meta event=0 ip=2606:4700:a0::5 type=http
-2026-08-09T01:48:39Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: EOF" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:48:39Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: EOF" connIndex=1 dest=https://lounge.thechatbotgenius.com/phoenix/live_reload/socket/websocket?vsn=2.0.0 event=0 ip=2606:4700:a0::5 type=ws
-2026-08-09T01:48:39Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: EOF" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:48:39Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: EOF" connIndex=1 dest=https://lounge.thechatbotgenius.com/socket/websocket?vsn=2.0.0 event=0 ip=2606:4700:a0::5 type=ws
-2026-08-09T01:48:39Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: EOF" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:48:39Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: EOF" connIndex=1 dest=https://lounge.thechatbotgenius.com/api/v1/meta event=0 ip=2606:4700:a0::5 type=http
-2026-08-09T01:48:40Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59989->[::1]:4000: read: connection reset by peer" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:48:40Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59989->[::1]:4000: read: connection reset by peer" connIndex=1 dest=https://lounge.thechatbotgenius.com/phoenix/live_reload/socket/websocket?vsn=2.0.0 event=0 ip=2606:4700:a0::5 type=ws
-2026-08-09T01:48:40Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59991->[::1]:4000: read: connection reset by peer" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:48:40Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59991->[::1]:4000: read: connection reset by peer" connIndex=1 dest=https://lounge.thechatbotgenius.com/socket/websocket?vsn=2.0.0 event=0 ip=2606:4700:a0::5 type=ws
-2026-08-09T01:48:40Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59992->[::1]:4000: read: connection reset by peer" connIndex=1 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T01:48:40Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:59992->[::1]:4000: read: connection reset by peer" connIndex=1 dest=https://lounge.thechatbotgenius.com/api/v1/meta event=0 ip=2606:4700:a0::5 type=http
-2026-08-09T02:14:57Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:61884->[::1]:4443: read: connection reset by peer" connIndex=1 event=1 ingressRule=2 originService=https://localhost:4443
-2026-08-09T02:14:57Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:61884->[::1]:4443: read: connection reset by peer" connIndex=1 dest=https://lounge-voice.thechatbotgenius.com/?roomId=9fBKkcf&peerId=9154e89e-1721-471a-bdd8-a37d5dc0e5ce event=0 ip=2606:4700:a0::5 type=ws
-2026-08-09T02:14:59Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:61886->[::1]:4443: read: connection reset by peer" connIndex=1 event=1 ingressRule=2 originService=https://localhost:4443
-2026-08-09T02:14:59Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:61886->[::1]:4443: read: connection reset by peer" connIndex=1 dest=https://lounge-voice.thechatbotgenius.com/?roomId=9fBKkcf&peerId=9154e89e-1721-471a-bdd8-a37d5dc0e5ce event=0 ip=2606:4700:a0::5 type=ws
-2026-08-09T02:15:02Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:61888->[::1]:4443: read: connection reset by peer" connIndex=1 event=1 ingressRule=2 originService=https://localhost:4443
-2026-08-09T02:15:02Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: read tcp [::1]:61888->[::1]:4443: read: connection reset by peer" connIndex=1 dest=https://lounge-voice.thechatbotgenius.com/?roomId=9fBKkcf&peerId=9154e89e-1721-471a-bdd8-a37d5dc0e5ce event=0 ip=2606:4700:a0::5 type=ws
-2026-08-09T04:14:17Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp [::1]:4443: connect: connection refused" connIndex=3 event=1 ingressRule=2 originService=https://localhost:4443
-2026-08-09T04:14:17Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp [::1]:4443: connect: connection refused" connIndex=3 dest=https://lounge-voice.thechatbotgenius.com/?roomId=FxjfVW8&peerId=abc700ff-5587-456f-b286-7723bf36637d event=0 ip=2606:4700:a0::1 type=ws
-2026-08-09T04:19:44Z ERR  error="Error writing response header: stream 1069 canceled by remote with error code 0" connIndex=2 event=1 ingressRule=0 originService=https://localhost:4000
-2026-08-09T04:19:44Z ERR Request failed error="Error writing response header: stream 1069 canceled by remote with error code 0" connIndex=2 dest=https://lounge.thechatbotgenius.com/FxjfVW8/the-lounge event=0 ip=2606:4700:a8::8 type=http
-2026-08-09T04:19:44Z ERR  error="stream 1065 canceled by remote with error code 0" connIndex=2 event=1 ingressRule=1 originService=https://localhost:8080
-2026-08-09T04:19:44Z ERR Request failed error="stream 1065 canceled by remote with error code 0" connIndex=2 dest=https://lounge-app.thechatbotgenius.com/assets/wasm/ammo.wasm-3a50d562f1ae5ec84690ec44f42e9c3d.wasm event=0 ip=2606:4700:a8::8 type=http
+2026-08-17T17:39:02Z INF Starting tunnel tunnelID=a7a1a3b9-0d58-42e9-97c6-f153b3c5c43c
+2026-08-17T17:39:02Z INF Version 2026.7.2 (Checksum c647bfd58ab7fa562d47061853321eb78b7205b110a45fff8f3c53196f3986a5)
+2026-08-17T17:39:02Z INF GOOS: darwin, GOVersion: go1.26.5, GoArch: arm64
+2026-08-17T17:39:02Z INF Settings: map[config:/Users/jaytarzwell/VR Meet Up/private-quest-lounge/cloudflared-lounge.yml cred-file:/Users/jaytarzwell/.cloudflared/a7a1a3b9-0d58-42e9-97c6-f153b3c5c43c.json credentials-file:/Users/jaytarzwell/.cloudflared/a7a1a3b9-0d58-42e9-97c6-f153b3c5c43c.json]
+2026-08-17T17:39:02Z INF cloudflared will not automatically update if installed by a package manager.
+2026-08-17T17:39:02Z INF Generated Connector ID: 52eadcd0-18f2-4b00-9bce-bc1fc640b412
+2026-08-17T17:39:02Z INF Initial protocol quic
+2026-08-17T17:39:02Z INF ICMP proxy will use 10.0.0.29 as source for IPv4
+2026-08-17T17:39:02Z INF ICMP proxy will use fe80::45:fb04:70c0:e1d2 in zone en1 as source for IPv6
+2026-08-17T17:39:02Z INF Created ICMP proxy listening on 10.0.0.29:0
+2026-08-17T17:39:02Z INF ICMP proxy will use 10.0.0.29 as source for IPv4
+2026-08-17T17:39:02Z INF ICMP proxy will use fe80::45:fb04:70c0:e1d2 in zone en1 as source for IPv6
+2026-08-17T17:39:02Z INF Starting metrics server on 127.0.0.1:20242/metrics
+2026-08-17T17:39:02Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=2606:4700:a0::4
+2026-08-17T17:39:02Z INF +-------------------------------------------------------------------------------------+
+2026-08-17T17:39:02Z INF |                               CONNECTIVITY PRE-CHECKS                               |
+2026-08-17T17:39:02Z INF +-------------------------------------------------------------------------------------+
+2026-08-17T17:39:02Z INF |  COMPONENT         TARGET                     STATUS  DETAILS                       |
+2026-08-17T17:39:02Z INF |  DNS Resolution    region1.v2.argotunnel.com  PASS    DNS Resolved successfully     |
+2026-08-17T17:39:02Z INF |  DNS Resolution    region2.v2.argotunnel.com  PASS    DNS Resolved successfully     |
+2026-08-17T17:39:02Z INF |  UDP Connectivity  region1.v2.argotunnel.com  PASS    QUIC connection successful    |
+2026-08-17T17:39:02Z INF |  UDP Connectivity  region2.v2.argotunnel.com  PASS    QUIC connection successful    |
+2026-08-17T17:39:02Z INF |  TCP Connectivity  region1.v2.argotunnel.com  PASS    HTTP/2 connection successful  |
+2026-08-17T17:39:02Z INF |  TCP Connectivity  region2.v2.argotunnel.com  PASS    HTTP/2 connection successful  |
+2026-08-17T17:39:02Z INF |  Cloudflare API    api.cloudflare.com:443     PASS    API is reachable              |
+2026-08-17T17:39:02Z INF |                                                                                     |
+2026-08-17T17:39:02Z INF |  SUMMARY: Environment is healthy. cloudflared will use 'quic' as primary protocol.  |
+2026-08-17T17:39:02Z INF +-------------------------------------------------------------------------------------+
+2026-08-17T17:39:02Z INF precheck component="DNS Resolution" details="DNS Resolved successfully" run_id=c41ccb70-d966-4185-8a8a-35a9e868c1c3 status=pass target=region1.v2.argotunnel.com
+2026-08-17T17:39:02Z INF precheck component="DNS Resolution" details="DNS Resolved successfully" run_id=c41ccb70-d966-4185-8a8a-35a9e868c1c3 status=pass target=region2.v2.argotunnel.com
+2026-08-17T17:39:02Z INF precheck component="UDP Connectivity" details="QUIC connection successful" run_id=c41ccb70-d966-4185-8a8a-35a9e868c1c3 status=pass target=region1.v2.argotunnel.com
+2026-08-17T17:39:02Z INF precheck component="UDP Connectivity" details="QUIC connection successful" run_id=c41ccb70-d966-4185-8a8a-35a9e868c1c3 status=pass target=region2.v2.argotunnel.com
+2026-08-17T17:39:02Z INF precheck component="TCP Connectivity" details="HTTP/2 connection successful" run_id=c41ccb70-d966-4185-8a8a-35a9e868c1c3 status=pass target=region1.v2.argotunnel.com
+2026-08-17T17:39:02Z INF precheck component="TCP Connectivity" details="HTTP/2 connection successful" run_id=c41ccb70-d966-4185-8a8a-35a9e868c1c3 status=pass target=region2.v2.argotunnel.com
+2026-08-17T17:39:02Z INF precheck component="Cloudflare API" details="API is reachable" run_id=c41ccb70-d966-4185-8a8a-35a9e868c1c3 status=pass target=api.cloudflare.com:443
+2026-08-17T17:39:02Z INF precheck complete hard_fail=false run_id=c41ccb70-d966-4185-8a8a-35a9e868c1c3 suggested_protocol=quic
+2026-08-17T17:39:02Z INF Registered tunnel connection connIndex=0 connection=3748618b-8915-4500-9609-fedf7ccb0318 event=0 ip=2606:4700:a0::4 location=yul01 protocol=quic
+2026-08-17T17:39:02Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=1 event=0 ip=2606:4700:a8::6
+2026-08-17T17:39:03Z INF Registered tunnel connection connIndex=1 connection=7a9e14da-b8d1-4b73-9d69-79ed2766d91f event=0 ip=2606:4700:a8::6 location=yyz04 protocol=quic
+2026-08-17T17:39:03Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=2 event=0 ip=2606:4700:a8::5
+2026-08-17T17:39:04Z INF Registered tunnel connection connIndex=2 connection=bb73be77-73a2-4be2-af83-ed4bb9716be0 event=0 ip=2606:4700:a8::5 location=yyz06 protocol=quic
+2026-08-17T17:39:04Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=3 event=0 ip=2606:4700:a0::3
+2026-08-17T17:39:05Z INF Registered tunnel connection connIndex=3 connection=13b4a9d9-ac4b-4c6d-a833-f1cba6bcec02 event=0 ip=2606:4700:a0::3 location=yul01 protocol=quic
+2026-08-17T19:20:34Z ERR failed to accept incoming stream requests error="failed to accept QUIC stream: timeout: no recent network activity" connIndex=2 event=0 ip=2606:4700:a8::5
+2026-08-17T19:20:34Z ERR failed to run the datagram handler error="timeout: no recent network activity" connIndex=2 event=0 ip=2606:4700:a8::5
+2026-08-17T19:20:34Z WRN failed to serve tunnel connection error="accept stream listener encountered a failure while serving" connIndex=2 event=0 ip=2606:4700:a8::5
+2026-08-17T19:20:34Z WRN Serve tunnel error error="accept stream listener encountered a failure while serving" connIndex=2 event=0 ip=2606:4700:a8::5
+2026-08-17T19:20:34Z INF Retrying connection in up to 1s connIndex=2 event=0 ip=2606:4700:a8::5
+2026-08-17T19:20:34Z WRN Connection terminated error="accept stream listener encountered a failure while serving" connIndex=2
+2026-08-17T19:20:51Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=2 event=0 ip=2606:4700:a8::5
+2026-08-17T19:20:52Z INF Registered tunnel connection connIndex=2 connection=c39e6703-71c4-45a0-8492-618ff418eff9 event=0 ip=2606:4700:a8::5 location=yyz06 protocol=quic
+2026-08-18T17:39:02Z WRN Your version 2026.7.2 is outdated. We recommend upgrading it to 2026.8.2
+2026-08-18T18:45:04Z ERR failed to run the datagram handler error="Application error 0x0 (remote)" connIndex=3 event=0 ip=2606:4700:a0::3
+2026-08-18T18:45:04Z ERR failed to accept incoming stream requests error="failed to accept QUIC stream: Application error 0x0 (remote)" connIndex=3 event=0 ip=2606:4700:a0::3
+2026-08-18T18:45:04Z WRN failed to serve tunnel connection error="datagram manager encountered a failure while serving" connIndex=3 event=0 ip=2606:4700:a0::3
+2026-08-18T18:45:04Z WRN Serve tunnel error error="datagram manager encountered a failure while serving" connIndex=3 event=0 ip=2606:4700:a0::3
+2026-08-18T18:45:04Z INF Retrying connection in up to 1s connIndex=3 event=0 ip=2606:4700:a0::3
+2026-08-18T18:45:05Z WRN Connection terminated error="datagram manager encountered a failure while serving" connIndex=3
+2026-08-18T18:45:18Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=3 event=0 ip=2606:4700:a0::3
+2026-08-18T18:45:18Z INF Registered tunnel connection connIndex=3 connection=889347b7-72ce-41ee-b9ad-a673127ff6b6 event=0 ip=2606:4700:a0::3 location=yul01 protocol=quic
+2026-08-18T21:39:52Z ERR failed to run the datagram handler error="Application error 0x0 (remote)" connIndex=3 event=0 ip=2606:4700:a0::3
+2026-08-18T21:39:52Z ERR failed to accept incoming stream requests error="failed to accept QUIC stream: Application error 0x0 (remote)" connIndex=3 event=0 ip=2606:4700:a0::3
+2026-08-18T21:39:52Z WRN failed to serve tunnel connection error="datagram manager encountered a failure while serving" connIndex=3 event=0 ip=2606:4700:a0::3
+2026-08-18T21:39:52Z WRN Serve tunnel error error="datagram manager encountered a failure while serving" connIndex=3 event=0 ip=2606:4700:a0::3
+2026-08-18T21:39:52Z INF Retrying connection in up to 1s connIndex=3 event=0 ip=2606:4700:a0::3
+2026-08-18T21:39:53Z WRN Connection terminated error="datagram manager encountered a failure while serving" connIndex=3
+2026-08-18T21:39:55Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=3 event=0 ip=2606:4700:a0::3
+2026-08-18T21:39:55Z INF Registered tunnel connection connIndex=3 connection=b6ad5161-f61f-4ff5-869e-b7e026b3e869 event=0 ip=2606:4700:a0::3 location=yul01 protocol=quic
+2026-08-18T21:47:27Z ERR failed to accept incoming stream requests error="failed to accept QUIC stream: Application error 0x0 (remote)" connIndex=0 event=0 ip=2606:4700:a0::4
+2026-08-18T21:47:27Z ERR failed to run the datagram handler error="context canceled" connIndex=0 event=0 ip=2606:4700:a0::4
+2026-08-18T21:47:27Z WRN failed to serve tunnel connection error="accept stream listener encountered a failure while serving" connIndex=0 event=0 ip=2606:4700:a0::4
+2026-08-18T21:47:27Z WRN Serve tunnel error error="accept stream listener encountered a failure while serving" connIndex=0 event=0 ip=2606:4700:a0::4
+2026-08-18T21:47:27Z INF Retrying connection in up to 1s connIndex=0 event=0 ip=2606:4700:a0::4
+2026-08-18T21:47:29Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=2606:4700:a0::4
+2026-08-18T21:47:29Z INF Registered tunnel connection connIndex=0 connection=f4917beb-f532-4f69-8d0d-d7c30675dc0b event=0 ip=2606:4700:a0::4 location=yul01 protocol=quic
+2026-08-18T22:10:05Z ERR failed to accept incoming stream requests error="failed to accept QUIC stream: Application error 0x0 (remote)" connIndex=3 event=0 ip=2606:4700:a0::3
+2026-08-18T22:10:05Z ERR failed to run the datagram handler error="Application error 0x0 (remote)" connIndex=3 event=0 ip=2606:4700:a0::3
+2026-08-18T22:10:05Z WRN failed to serve tunnel connection error="accept stream listener encountered a failure while serving" connIndex=3 event=0 ip=2606:4700:a0::3
+2026-08-18T22:10:05Z WRN Serve tunnel error error="accept stream listener encountered a failure while serving" connIndex=3 event=0 ip=2606:4700:a0::3
+2026-08-18T22:10:05Z INF Retrying connection in up to 1s connIndex=3 event=0 ip=2606:4700:a0::3
+2026-08-18T22:10:06Z WRN Connection terminated error="accept stream listener encountered a failure while serving" connIndex=3
+2026-08-18T22:10:09Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=3 event=0 ip=2606:4700:a0::3
+2026-08-18T22:10:09Z INF Registered tunnel connection connIndex=3 connection=b0c53e4c-c4f1-4d49-9f66-0c5dfdde4146 event=0 ip=2606:4700:a0::3 location=yul01 protocol=quic
+2026-08-19T00:26:06Z ERR failed to run the datagram handler error="Application error 0x0 (remote)" connIndex=1 event=0 ip=2606:4700:a8::6
+2026-08-19T00:26:06Z ERR failed to accept incoming stream requests error="failed to accept QUIC stream: Application error 0x0 (remote)" connIndex=1 event=0 ip=2606:4700:a8::6
+2026-08-19T00:26:06Z WRN failed to serve tunnel connection error="datagram manager encountered a failure while serving" connIndex=1 event=0 ip=2606:4700:a8::6
+2026-08-19T00:26:06Z WRN Serve tunnel error error="datagram manager encountered a failure while serving" connIndex=1 event=0 ip=2606:4700:a8::6
+2026-08-19T00:26:06Z INF Retrying connection in up to 1s connIndex=1 event=0 ip=2606:4700:a8::6
+2026-08-19T00:26:08Z WRN Connection terminated error="datagram manager encountered a failure while serving" connIndex=1
+2026-08-19T00:26:27Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=1 event=0 ip=2606:4700:a8::6
+2026-08-19T00:26:27Z INF Registered tunnel connection connIndex=1 connection=f7ee9af2-bf74-4ccb-92ca-097f970e4b5b event=0 ip=2606:4700:a8::6 location=yyz06 protocol=quic
+2026-08-19T00:30:35Z ERR failed to accept incoming stream requests error="failed to accept QUIC stream: Application error 0x0 (remote)" connIndex=2 event=0 ip=2606:4700:a8::5
+2026-08-19T00:30:35Z ERR failed to run the datagram handler error="Application error 0x0 (remote)" connIndex=2 event=0 ip=2606:4700:a8::5
+2026-08-19T00:30:35Z WRN failed to serve tunnel connection error="accept stream listener encountered a failure while serving" connIndex=2 event=0 ip=2606:4700:a8::5
+2026-08-19T00:30:35Z WRN Serve tunnel error error="accept stream listener encountered a failure while serving" connIndex=2 event=0 ip=2606:4700:a8::5
+2026-08-19T00:30:35Z INF Retrying connection in up to 1s connIndex=2 event=0 ip=2606:4700:a8::5
+2026-08-19T00:30:36Z WRN Connection terminated error="accept stream listener encountered a failure while serving" connIndex=2
+2026-08-19T00:30:39Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=2 event=0 ip=2606:4700:a8::5
+2026-08-19T00:30:39Z INF Registered tunnel connection connIndex=2 connection=00fb5936-0394-4ec7-bfa0-c23504d86872 event=0 ip=2606:4700:a8::5 location=yyz04 protocol=quic
+2026-08-19T01:59:19Z ERR failed to accept incoming stream requests error="failed to accept QUIC stream: Application error 0x0 (remote)" connIndex=1 event=0 ip=2606:4700:a8::6
+2026-08-19T01:59:19Z ERR failed to run the datagram handler error="Application error 0x0 (remote)" connIndex=1 event=0 ip=2606:4700:a8::6
+2026-08-19T01:59:19Z WRN failed to serve tunnel connection error="accept stream listener encountered a failure while serving" connIndex=1 event=0 ip=2606:4700:a8::6
+2026-08-19T01:59:19Z WRN Serve tunnel error error="accept stream listener encountered a failure while serving" connIndex=1 event=0 ip=2606:4700:a8::6
+2026-08-19T01:59:19Z INF Retrying connection in up to 1s connIndex=1 event=0 ip=2606:4700:a8::6
+2026-08-19T01:59:19Z WRN Connection terminated error="accept stream listener encountered a failure while serving" connIndex=1
+2026-08-19T01:59:31Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=1 event=0 ip=2606:4700:a8::6
+2026-08-19T01:59:31Z INF Registered tunnel connection connIndex=1 connection=b95ed121-9b2b-40cd-9321-ff72822d3719 event=0 ip=2606:4700:a8::6 location=yyz06 protocol=quic
+2026-08-19T02:00:37Z ERR failed to accept incoming stream requests error="failed to accept QUIC stream: timeout: no recent network activity" connIndex=2 event=0 ip=2606:4700:a8::5
+2026-08-19T02:00:37Z ERR failed to run the datagram handler error="timeout: no recent network activity" connIndex=2 event=0 ip=2606:4700:a8::5
+2026-08-19T02:00:37Z WRN failed to serve tunnel connection error="accept stream listener encountered a failure while serving" connIndex=2 event=0 ip=2606:4700:a8::5
+2026-08-19T02:00:37Z WRN Serve tunnel error error="accept stream listener encountered a failure while serving" connIndex=2 event=0 ip=2606:4700:a8::5
+2026-08-19T02:00:37Z INF Retrying connection in up to 1s connIndex=2 event=0 ip=2606:4700:a8::5
+2026-08-19T02:00:37Z WRN Connection terminated error="accept stream listener encountered a failure while serving" connIndex=2
+2026-08-19T02:00:40Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=2 event=0 ip=2606:4700:a8::5
+2026-08-19T02:00:40Z INF Registered tunnel connection connIndex=2 connection=1cbb8302-d387-4e8f-80ef-2c744d4d25a6 event=0 ip=2606:4700:a8::5 location=yyz04 protocol=quic
+2026-08-19T17:39:03Z WRN Your version 2026.7.2 is outdated. We recommend upgrading it to 2026.8.2
+2026-08-20T02:58:51Z ERR  error="stream 293 canceled by remote with error code 0" connIndex=3 event=1 ingressRule=1 originService=https://localhost:4000
+2026-08-20T02:58:51Z ERR Request failed error="stream 293 canceled by remote with error code 0" connIndex=3 dest=https://lounge.thechatbotgenius.com/FxjfVW8 event=0 ip=2606:4700:a0::3 type=http
+2026-08-20T17:39:03Z WRN Your version 2026.7.2 is outdated. We recommend upgrading it to 2026.8.2
+2026-08-21T17:39:03Z WRN Your version 2026.7.2 is outdated. We recommend upgrading it to 2026.8.2

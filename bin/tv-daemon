@@ -1,0 +1,119 @@
+#!/usr/bin/env node
+// Lounge TV daemon: listens on localhost:9917 for the in-room TV power button
+// (routed through the Cloudflare tunnel as /lounge-tv/9c4f/on) and launches a
+// dedicated Chrome instance that joins the room as the screen-share client.
+//
+// Hands-free flow (press the red button in VR):
+//   1. Default audio output switches to BlackHole 2ch (if installed) — all
+//      Mac audio now flows into the room instead of the Mac speakers.
+//   2. Chrome (own profile, ~/.lounge-tv-chrome) joins the room, captures the
+//      entire main screen (--auto-select-desktop-capture-source) and uses
+//      BlackHole as its mic (--use-fake-ui-for-media-stream auto-grants).
+//   3. When that Chrome instance exits, audio output is restored.
+//
+// Start: nohup bin/tv-daemon > /tmp/lounge-tv-daemon.log 2>&1 &
+//        (bin/up-public starts it automatically)
+
+const http = require("http");
+const { execFile, execFileSync } = require("child_process");
+
+const PORT = 9917;
+const SECRET_PATH = "/lounge-tv/9c4f/on";
+const ROOM_URL = "https://lounge.thechatbotgenius.com/FxjfVW8/the-lounge?tv=1";
+const PROFILE = `${process.env.HOME}/.lounge-tv-chrome`;
+const SWITCHER = "/opt/homebrew/bin/SwitchAudioSource";
+const LOOPBACK = "BlackHole 2ch";
+let lastLaunch = 0;
+let restoreDevice = null;
+let watcher = null;
+
+const log = (...a) => console.log(new Date().toISOString(), ...a);
+
+function audioDevices() {
+  try {
+    return execFileSync(SWITCHER, ["-a", "-t", "output"], { encoding: "utf8" });
+  } catch {
+    return "";
+  }
+}
+
+function switchToLoopback() {
+  if (!audioDevices().includes(LOOPBACK)) {
+    log("BlackHole not installed — sharing silent video");
+    return;
+  }
+  try {
+    restoreDevice = execFileSync(SWITCHER, ["-c"], { encoding: "utf8" }).trim();
+    if (restoreDevice === LOOPBACK) restoreDevice = null;
+    execFileSync(SWITCHER, ["-s", LOOPBACK]);
+    log(`audio output -> ${LOOPBACK} (was: ${restoreDevice || "unknown"})`);
+  } catch (e) {
+    log("audio switch failed:", e.message);
+  }
+}
+
+function tvChromeRunning() {
+  try {
+    execFileSync("pgrep", ["-f", "MacOS/Google Chrome.*lounge-tv-chrome"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function watchForExit() {
+  if (watcher) clearInterval(watcher);
+  watcher = setInterval(() => {
+    if (!tvChromeRunning()) {
+      clearInterval(watcher);
+      watcher = null;
+      if (restoreDevice) {
+        try {
+          execFileSync(SWITCHER, ["-s", restoreDevice]);
+          log(`audio output restored -> ${restoreDevice}`);
+        } catch (e) {
+          log("audio restore failed:", e.message);
+        }
+        restoreDevice = null;
+      }
+    }
+  }, 10_000);
+}
+
+http
+  .createServer((req, res) => {
+    if (req.url !== SECRET_PATH) {
+      res.writeHead(404).end();
+      return;
+    }
+    const now = Date.now();
+    if (now - lastLaunch < 60_000 || tvChromeRunning()) {
+      // Chrome may be up with the speakers still live (stale launch, manual
+      // start, restored device). The button must always yield the silent-Mac
+      // state, so re-assert the loopback even when we skip the launch.
+      switchToLoopback();
+      watchForExit();
+      res.writeHead(200).end("already-on");
+      return;
+    }
+    lastLaunch = now;
+    switchToLoopback();
+    execFile("open", [
+      "-na",
+      "Google Chrome",
+      "--args",
+      `--user-data-dir=${PROFILE}`,
+      "--no-first-run",
+      // NOTE: --use-fake-ui-for-media-stream is unsupported in current Chrome
+      // and silently breaks getDisplayMedia (NotReadableError). Mic permission
+      // is pre-granted in the profile Preferences instead.
+      // Multi-display Macs name sources "Screen 1"/"Screen 2" — there is no
+      // "Entire screen" source when more than one display is attached.
+      '--auto-select-desktop-capture-source=Screen 1',
+      ROOM_URL
+    ]);
+    log("TV launched");
+    setTimeout(watchForExit, 30_000);
+    res.writeHead(200).end("ok");
+  })
+  .listen(PORT, "127.0.0.1", () => log(`lounge tv-daemon on ${PORT}`));

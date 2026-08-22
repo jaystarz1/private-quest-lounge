@@ -1,0 +1,29 @@
+meta:
+  last_updated: "2026-08-22"
+  purpose: "Operational continuity for the private Quest lounge"
+
+current_state:
+  active_task: "Publish complete lounge workspace"
+  status: "complete"
+  next_action: "In tonight's headset test, occupy all four hot-tub seats and all six bed seats, then confirm the tub eye line is in the water and every bed occupant remains upright."
+  summary: "Committed and pushed the complete working trees for the main lounge, Hubs client, Dialog, and Reticulum repositories on their lounge branches. The Hubs changed-file lint, HTML check, unit test, staged whitespace check, public build, structure audit, glTF validation, and deployed checksum verification passed."
+
+pending_tasks:
+  - task: "Run a two-Quest headset soak test covering the corrected tub/bed seats, movement, controller tracking loss, voice, foreground loss, view switching, and a brief Wi-Fi interruption while capturing client logs."
+    priority: "high"
+  - task: "Add coturn/TURN if remote-network testing still cannot establish media through the direct public/LAN candidates."
+    priority: "medium"
+  - task: "Revisit further mesh and draw-call optimization only if tonight's headset profiling still shows frame pressure."
+    priority: "medium"
+
+session_history:
+  - date: "2026-08-22"
+    summary: "Committed and pushed all current changes across the main lounge, Hubs, Dialog, and Reticulum repositories after passing the Hubs hook checks in Docker."
+  - date: "2026-08-21"
+    summary: "Added true seated eye heights for the hot tub, replaced six sideways bed targets with upright seats, rebuilt and deployed, and checksum-verified the public model and client."
+  - date: "2026-08-18"
+    summary: "Lowered all four hot-tub occupancy targets onto the submerged physical seats, added permanent height gates, rebuilt and visually audited the model, and checksum-verified the live deployment."
+  - date: "2026-08-18"
+    summary: "Deployed the Quest stability fix: removed idle hard exits, hardened media retries, deduplicated the tunnel, reduced texture memory 53 percent, and passed live, type, unit, GLB, and checksum verification."
+  - date: "2026-08-18"
+    summary: "Re-audited the live stack and structure; verified healthy services and controller neutralization, then found the Oculus hard exit, media churn, duplicate tunnel connector, and high decoded texture load."

@@ -1,0 +1,11 @@
+#!/bin/sh
+# Start the lounge TV: opens the room in Chrome as the dedicated screen-share
+# client (?tv=1). Flow once the page loads:
+#   1. Sign in if prompted (admin account — needed for media permission).
+#   2. Click "Enter on Screen" and choose Enter WITHOUT microphone.
+#   3. Chrome's share picker appears automatically: pick a *Chrome Tab* to
+#      include its audio (macOS cannot capture audio for full-screen shares),
+#      or a screen/window for silent video.
+# The video lands on the wall TV for everyone; audio (if a tab) plays in both
+# headsets. Close the tab or stop sharing to blank the TV.
+open -a "Google Chrome" "https://lounge.thechatbotgenius.com/FxjfVW8/the-lounge?tv=1"

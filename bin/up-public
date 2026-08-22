@@ -1,5 +1,6 @@
 #!/bin/bash
 # Start the lounge stack in public-tunnel mode + the Cloudflare tunnel.
+PATH="/Applications/Docker.app/Contents/Resources/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 basedir=$(cd "$(dirname "$0")"/.. && pwd)
 source "$basedir"/bin/lib-env
 
@@ -17,16 +18,47 @@ if [ -z "$LOUNGE_SMTP_PASSWORD" ] && [ -f "$HOME/Bedtime_Stories/.env" ]; then
   export LOUNGE_SMTP_PASSWORD
 fi
 echo "Public media (WebRTC) IP: $PUBLIC_MEDIA_IP (LAN: $LAN_MEDIA_IP)"
-echo "Router must forward UDP+TCP 40000-40050 to this machine for voice."
+echo "Router must forward UDP+TCP 40000-40031 to this machine for voice."
 
+# Build the immutable client while the current lounge stays online. The live
+# container only serves dist, so a process restart is fast and low-memory.
+docker compose -f "$basedir"/docker-compose.yml -f "$basedir"/docker-compose.public.yml run --rm --no-deps hubs-client npm run build:public || exit 1
 docker compose -f "$basedir"/docker-compose.yml -f "$basedir"/docker-compose.public.yml up --build --detach
 
-if ! pgrep -f "cloudflared tunnel --config $basedir/cloudflared-lounge.yml" > /dev/null; then
+find_lounge_tunnel_pids() {
+  pgrep -f "[c]loudflared tunnel .*cloudflared-lounge\\.yml run"
+}
+
+tunnel_pids=$(find_lounge_tunnel_pids)
+if [ -z "$tunnel_pids" ]; then
   echo "Starting Cloudflare tunnel (logs: $basedir/cloudflared-lounge.log)..."
   nohup cloudflared tunnel --config "$basedir"/cloudflared-lounge.yml run > "$basedir"/cloudflared-lounge.log 2>&1 &
   echo $! > "$basedir"/cloudflared-lounge.pid
 else
-  echo "Cloudflare tunnel already running."
+  managed_pid=""
+  if [ -f "$basedir/cloudflared-lounge.pid" ]; then
+    candidate=$(cat "$basedir/cloudflared-lounge.pid")
+    if echo "$tunnel_pids" | grep -qx "$candidate"; then
+      managed_pid=$candidate
+    fi
+  fi
+  if [ -z "$managed_pid" ]; then
+    managed_pid=$(echo "$tunnel_pids" | head -n 1)
+  fi
+  echo "$managed_pid" > "$basedir"/cloudflared-lounge.pid
+  for tunnel_pid in $tunnel_pids; do
+    if [ "$tunnel_pid" != "$managed_pid" ]; then
+      kill "$tunnel_pid" 2>/dev/null && echo "Stopped duplicate Cloudflare tunnel process $tunnel_pid."
+    fi
+  done
+  echo "Cloudflare tunnel already running as process $managed_pid."
+fi
+
+if ! pgrep -f "bin/tv-daemon" > /dev/null; then
+  echo "Starting lounge TV daemon (in-room power button)..."
+  nohup "$basedir"/bin/tv-daemon > /tmp/lounge-tv-daemon.log 2>&1 &
+else
+  echo "TV daemon already running."
 fi
 # Re-assert router port mappings for voice media (UPnP; survives router reboots
 # as long as this re-runs) and keep the Mac awake while the lounge is up.

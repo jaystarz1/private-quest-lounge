@@ -1,0 +1,19 @@
+#!/bin/bash
+# Stop everything bin/up-public started: stack, Cloudflare tunnel, TV daemon,
+# caffeinate. Counterpart to up-public for on-demand sessions.
+basedir=$(cd "$(dirname "$0")"/.. && pwd)
+source "$basedir"/bin/lib-env
+
+compose down
+
+if [ -f "$basedir"/cloudflared-lounge.pid ]; then
+  kill "$(cat "$basedir"/cloudflared-lounge.pid)" 2>/dev/null
+  rm -f "$basedir"/cloudflared-lounge.pid
+  echo "Cloudflare tunnel stopped."
+fi
+# Catch a tunnel started manually with a relative config path. The startup
+# command accepts both forms, so shutdown must recognize both forms too.
+pkill -f "[c]loudflared tunnel .*cloudflared-lounge\\.yml run" 2>/dev/null
+pkill -f "$basedir/bin/tv-daemon" 2>/dev/null && echo "TV daemon stopped."
+pkill -f "caffeinate -si" 2>/dev/null && echo "caffeinate stopped."
+echo "Lounge is down."
