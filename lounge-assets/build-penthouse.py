@@ -485,6 +485,46 @@ recolor_region(-10.0, -7.8, -5.1, -2.6, 3.68, 4.24, "EFE4CD", rough=0.8, label="
 recolor_region(-10.99, -10.84, 5.7, 8.8, 4.25, 6.2, "2F5D5A", rough=0.85,
                label="HeadboardTeal", only_mats={'fake_mat_6_5_5_255'})
 
+# --- West-wall coplanar shells ----------------------------------------------
+# Every source material is doubleSided, so back faces pressed flat against a
+# wall z-fight it in the headset (the strobing band above/behind the TV). The
+# probes in probe-niche.py located each coincident pair; delete the hidden
+# back-facing member of every pair, leaving the wall itself intact.
+def delete_directional_faces(object_name, x1, x2, y1, y2, z1, z2, nx_lo, nx_hi, label):
+    ob = bpy.data.objects.get(object_name)
+    if not ob or ob.type != 'MESH':
+        raise RuntimeError(f"{label}: source mesh {object_name} missing")
+    mw = ob.matrix_world
+    nmat = mw.to_3x3()
+    bmn = bmesh.new()
+    bmn.from_mesh(ob.data)
+    doomed = []
+    for f in bmn.faces:
+        c = mw @ f.calc_center_median()
+        if not (x1 < c.x < x2 and y1 < c.y < y2 and z1 < c.z < z2):
+            continue
+        n = (nmat @ f.normal).normalized()
+        if nx_lo <= n.x <= nx_hi:
+            doomed.append(f)
+    if doomed:
+        bmesh.ops.delete(bmn, geom=doomed, context='FACES')
+        bmn.to_mesh(ob.data)
+    bmn.free()
+    bpy.context.view_layer.update()
+    print(f"DELETE-DIRECTIONAL {label}: {len(doomed)} faces")
+
+# TV niche back panel (lounge, in direct view from the whole great room).
+delete_directional_faces("Object_43", -11.00, -10.90, 5.4, 7.5, 1.0, 2.2,
+                         -1.0, -0.7, "tv-niche-backface")
+# Upstairs NW band directly above the lounge wall.
+delete_directional_faces("Object_62", -11.03, -10.93, 6.0, 8.6, 3.45, 4.8,
+                         -1.0, -0.7, "nw-wall-backface")
+# Small duvet/cushion faces pressed into the NW headboard trim.
+delete_directional_faces("Object_60", -10.99, -10.90, 6.6, 8.2, 4.15, 4.6,
+                         -1.0, -0.7, "nw-duvet-backface")
+delete_directional_faces("Object_45", -10.76, -10.69, 6.9, 8.1, 4.2, 4.5,
+                         -1.0, -0.7, "nw-cushion-backface")
+
 # --- Styled furniture accents (by region, so shared materials stay put) ------
 # Lounge sofa throw pillows: teal / mustard / rust blocks at the corners.
 recolor_region(-10.1, -9.3, 8.3, 9.3, 0.32, 0.78, "2E6E6A", label="PillowTeal")
@@ -1119,9 +1159,21 @@ dark.use_nodes = True
 bsdf = dark.node_tree.nodes['Principled BSDF']
 bsdf.inputs['Base Color'].default_value = (0.02, 0.027, 0.04, 1)
 bsdf.inputs['Roughness'].default_value = 0.3
-# West-wall black panel, facing east into the lounge (rotate -y normal to +x)
-tv = plane("TVScreen", 2.6, 1.5, -11.14, 6.8, 1.9, 0, dark)
+# West-wall black panel, facing east into the lounge (rotate -y normal to +x).
+# The wall face position drifts as the source mesh is edited, and an authored
+# constant once left the whole TV buried 24 cm behind the wall — so probe the
+# actual wall around the mount point and hang the panel 3 cm proud of it.
+tv_dg = bpy.context.evaluated_depsgraph_get()
+tv_wall_x = None
+for py, pz in ((7.9, 2.5), (5.7, 2.5), (6.8, 2.4), (7.9, 1.3)):
+    hit, loc, _, _, _, _ = sc.ray_cast(tv_dg, Vector((-8.0, py, pz)), Vector((-1, 0, 0)), distance=4.0)
+    if hit and (tv_wall_x is None or loc.x > tv_wall_x):
+        tv_wall_x = loc.x
+if tv_wall_x is None:
+    raise RuntimeError("TVScreen wall probe found no west wall")
+tv = plane("TVScreen", 2.6, 1.5, tv_wall_x + 0.03, 6.8, 1.9, 0, dark)
 tv.rotation_euler = (0, 0, math.pi / 2)
+print(f"TVSCREEN wall at x={tv_wall_x:.3f}, panel at x={tv_wall_x + 0.03:.3f}")
 mon = plane("MonitorScreen", 1.06, 0.6, 9.9, -0.78, 1.25, 0, dark)
 mon.rotation_euler = (0, 0, math.pi)  # flip to face +y (toward the bar stools)
 

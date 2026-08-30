@@ -1,12 +1,12 @@
 meta:
-  last_updated: "2026-08-22"
+  last_updated: "2026-08-29"
   purpose: "Operational continuity for the private Quest lounge"
 
 current_state:
-  active_task: "Publish complete lounge workspace"
+  active_task: "Post-meetup fixes deployed: hand tracking, TV placement, strobing wall"
   status: "complete"
-  next_action: "In tonight's headset test, occupy all four hot-tub seats and all six bed seats, then confirm the tub eye line is in the water and every bed occupant remains upright."
-  summary: "Committed and pushed the complete working trees for the main lounge, Hubs client, Dialog, and Reticulum repositories on their lounge branches. The Hubs changed-file lint, HTML check, unit test, staged whitespace check, public build, structure audit, glTF validation, and deployed checksum verification passed."
+  next_action: "Headset-verify: set controllers down (hands should be inert, no teleport ray or alert loop), confirm the TV panel and both wall buttons are visible on the west wall, and confirm the strobing band above the TV is gone."
+  summary: "Deployed three fixes: the client now ignores Quest hand-tracking input sources and neutralizes button state on tracking loss (no more spontaneous teleports or stuck rays), the TVScreen is ray-snapped 3 cm proud of the actual west wall with tv.js buttons anchored to it, and 50 coplanar back faces that strobed against the west wall were deleted from the model. Deployed GLB and hub bundle checksum-verified against the live site."
 
 pending_tasks:
   - task: "Run a two-Quest headset soak test covering the corrected tub/bed seats, movement, controller tracking loss, voice, foreground loss, view switching, and a brief Wi-Fi interruption while capturing client logs."
@@ -17,13 +17,13 @@ pending_tasks:
     priority: "medium"
 
 session_history:
+  - date: "2026-08-30"
+    summary: "Fixed and deployed: hand-tracking sources ignored + buttons neutralized on tracking loss, TVScreen ray-snapped proud of the west wall with buttons anchored to it, coplanar strobing wall faces deleted; build, probes, audit and live checksums all verified."
+  - date: "2026-08-29"
+    summary: "Diagnosed meetup glitches: hand tracking registered as fake controllers (pinch=teleport, latched trigger on tracking loss), cabin-era tv.js coordinates hide the shared screen behind the penthouse wall; servers verified healthy, piano geometry verified clean."
   - date: "2026-08-22"
     summary: "Committed and pushed all current changes across the main lounge, Hubs, Dialog, and Reticulum repositories after passing the Hubs hook checks in Docker."
   - date: "2026-08-21"
     summary: "Added true seated eye heights for the hot tub, replaced six sideways bed targets with upright seats, rebuilt and deployed, and checksum-verified the public model and client."
   - date: "2026-08-18"
     summary: "Lowered all four hot-tub occupancy targets onto the submerged physical seats, added permanent height gates, rebuilt and visually audited the model, and checksum-verified the live deployment."
-  - date: "2026-08-18"
-    summary: "Deployed the Quest stability fix: removed idle hard exits, hardened media retries, deduplicated the tunnel, reduced texture memory 53 percent, and passed live, type, unit, GLB, and checksum verification."
-  - date: "2026-08-18"
-    summary: "Re-audited the live stack and structure; verified healthy services and controller neutralization, then found the Oculus hard exit, media churn, duplicate tunnel connector, and high decoded texture load."
