@@ -1,12 +1,12 @@
 meta:
-  last_updated: "2026-08-29"
+  last_updated: "2026-08-31"
   purpose: "Operational continuity for the private Quest lounge"
 
 current_state:
-  active_task: "Post-meetup fixes deployed: hand tracking, TV placement, strobing wall"
+  active_task: "Removed the picture frame overlapping the TV; audited Sat Aug 30 session"
   status: "complete"
-  next_action: "Headset-verify: set controllers down (hands should be inert, no teleport ray or alert loop), confirm the TV panel and both wall buttons are visible on the west wall, and confirm the strobing band above the TV is gone."
-  summary: "Deployed three fixes: the client now ignores Quest hand-tracking input sources and neutralizes button state on tracking loss (no more spontaneous teleports or stuck rays), the TVScreen is ray-snapped 3 cm proud of the actual west wall with tv.js buttons anchored to it, and 50 coplanar back faces that strobed against the west wall were deleted from the model. Deployed GLB and hub bundle checksum-verified against the live site."
+  next_action: "Headset-verify the TV wall is frame-free. If the guest with broken voice returns, their ICE loop (restart every 30s all session) confirms the coturn/TURN task is now blocking."
+  summary: "Deleted the source model's 2.0x1.2 west-wall picture frame (24 faces in Object_64/69 at x=-10.90) that rendered over the TV panel; rebuilt, deployed, checksum-verified live. Sat session audit: servers healthy, hands fix was live, but one guest's dialog transports ICE-restarted every 30s for their whole 73 min (voice likely broken for them) - the known no-TURN case."
 
 pending_tasks:
   - task: "Run a two-Quest headset soak test covering the corrected tub/bed seats, movement, controller tracking loss, voice, foreground loss, view switching, and a brief Wi-Fi interruption while capturing client logs."
@@ -17,6 +17,8 @@ pending_tasks:
     priority: "medium"
 
 session_history:
+  - date: "2026-08-31"
+    summary: "Removed the west-wall picture frame that overlapped the TV panel (24 faces), redeployed and checksum-verified; audited Sat session: servers clean, one guest stuck in a 30s ICE-restart loop all night (needs TURN)."
   - date: "2026-08-30"
     summary: "Fixed and deployed: hand-tracking sources ignored + buttons neutralized on tracking loss, TVScreen ray-snapped proud of the west wall with buttons anchored to it, coplanar strobing wall faces deleted; build, probes, audit and live checksums all verified."
   - date: "2026-08-29"
@@ -25,5 +27,3 @@ session_history:
     summary: "Committed and pushed all current changes across the main lounge, Hubs, Dialog, and Reticulum repositories after passing the Hubs hook checks in Docker."
   - date: "2026-08-21"
     summary: "Added true seated eye heights for the hot tub, replaced six sideways bed targets with upright seats, rebuilt and deployed, and checksum-verified the public model and client."
-  - date: "2026-08-18"
-    summary: "Lowered all four hot-tub occupancy targets onto the submerged physical seats, added permanent height gates, rebuilt and visually audited the model, and checksum-verified the live deployment."

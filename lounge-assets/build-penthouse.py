@@ -525,6 +525,16 @@ delete_directional_faces("Object_60", -10.99, -10.90, 6.6, 8.2, 4.15, 4.6,
 delete_directional_faces("Object_45", -10.76, -10.69, 6.9, 8.1, 4.2, 4.5,
                          -1.0, -0.7, "nw-cushion-backface")
 
+# The source model hangs a 2.0 x 1.2 picture frame on the west wall exactly
+# where the TVScreen mounts (frame front at x=-10.897, panel at -10.923), so
+# the empty frame renders over the TV. Remove the whole frame: Object_64 holds
+# the front border + outer bevel, Object_69 the inner lip. Normal range -1..1
+# matches every face inside the box; both objects have nothing else there.
+delete_directional_faces("Object_64", -10.94, -10.885, 5.35, 7.55, 0.95, 2.30,
+                         -1.0, 1.0, "tv-picture-frame")
+delete_directional_faces("Object_69", -10.94, -10.885, 5.35, 7.55, 0.95, 2.30,
+                         -1.0, 1.0, "tv-picture-lip")
+
 # --- Styled furniture accents (by region, so shared materials stay put) ------
 # Lounge sofa throw pillows: teal / mustard / rust blocks at the corners.
 recolor_region(-10.1, -9.3, 8.3, 9.3, 0.32, 0.78, "2E6E6A", label="PillowTeal")
