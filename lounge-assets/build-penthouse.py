@@ -826,6 +826,175 @@ dg = bpy.context.evaluated_depsgraph_get()
 total_after = sum(tri_count(o) for o in sc.collection.all_objects if o.type == 'MESH')
 print(f"DECIMATE {total_before} -> {total_after}")
 
+# --- Coplanar wall dedupe ----------------------------------------------------
+# The source model overlays big merged wall shells (Object_32, Object_61, ...)
+# on top of per-room wall objects, leaving many wall areas as two coplanar
+# faces less than a millimetre apart. Every material is doubleSided, so those
+# pairs z-fight as strobing patches. Generic pass: find near-exact coplanar
+# overlapping axis-aligned wall faces inside the living volume, ray-probe which
+# member is actually visible from open space, delete fully hidden members, and
+# nudge apart back-to-back membranes that are visible from both sides.
+def dedupe_coplanar_walls():
+    from collections import defaultdict as dd
+    ALIGN, GAPMAX, STEP = 0.985, 0.0012, 0.002
+    IV = (-11.2, 11.8, -10.6, 10.1, -0.3, 7.2)  # interior volume
+    SKIP = ("TVScreen", "NavMesh", "Spawn", "Seat_", "RockiesView", "ViewEast",
+            "ViewWest", "ViewSouth", "Art_", "Monitor")
+    dgl = bpy.context.evaluated_depsgraph_get()
+
+    faces = []  # (axis, plane, umin, umax, vmin, vmax, obname, sign, fidx)
+    for ob in [o for o in sc.collection.all_objects if o.type == 'MESH']:
+        if ob.name.startswith(SKIP):
+            continue
+        mw = ob.matrix_world
+        nmat = mw.to_3x3()
+        for p in ob.data.polygons:
+            n = nmat @ p.normal
+            if n.length < 1e-6:
+                continue
+            n = n.normalized()
+            axis = 0 if abs(n.x) >= ALIGN else (1 if abs(n.y) >= ALIGN else None)
+            if axis is None:
+                continue
+            c = mw @ p.center
+            if not (IV[0] < c.x < IV[1] and IV[2] < c.y < IV[3] and IV[4] < c.z < IV[5]):
+                continue
+            verts = [mw @ ob.data.vertices[vi].co for vi in p.vertices]
+            u_ax, v_ax = [i for i in range(3) if i != axis]
+            us = [v[u_ax] for v in verts]
+            vs = [v[v_ax] for v in verts]
+            if (max(us) - min(us)) * (max(vs) - min(vs)) < 0.0004:
+                continue
+            faces.append((axis, c[axis], min(us), max(us), min(vs), max(vs),
+                          ob.name, 1 if n[axis] > 0 else -1, p.index))
+
+    buckets = dd(list)
+    for f in faces:
+        buckets[(f[0], int(math.floor(f[1] / STEP)))].append(f)
+
+    # cluster key -> {"members": {ob: set(face idx)}, sample data}
+    clusters = dd(lambda: {"members": dd(set), "region": [1e9, -1e9, 1e9, -1e9],
+                           "planes": {}, "signs": dd(set), "faces": set()})
+    for (axis, b), lst in buckets.items():
+        for nb in (b, b + 1):
+            other = buckets.get((axis, nb), [])
+            for i, f in enumerate(lst):
+                cand = other[i + 1:] if nb == b else other
+                for g in cand:
+                    if f[6] == g[6] or abs(f[1] - g[1]) > GAPMAX:
+                        continue
+                    ou = min(f[3], g[3]) - max(f[2], g[2])
+                    ov = min(f[5], g[5]) - max(f[4], g[4])
+                    if ou <= 0.02 or ov <= 0.02 or ou * ov < 0.002:
+                        continue
+                    key = (axis, round(f[1] / 0.05) * 0.05, tuple(sorted((f[6], g[6]))))
+                    cl = clusters[key]
+                    for fc in (f, g):
+                        cl["members"][fc[6]].add(fc[8])
+                        cl["planes"][fc[6]] = fc[1]
+                        cl["signs"][fc[6]].add(fc[7])
+                        cl["faces"].add((fc[6], fc[8]))
+                    r = cl["region"]
+                    r[0] = min(r[0], max(f[2], g[2])); r[1] = max(r[1], min(f[3], g[3]))
+                    r[2] = min(r[2], max(f[4], g[4])); r[3] = max(r[3], min(f[5], g[5]))
+
+    doomed = dd(set)   # obname -> face indices
+    nudged = dd(set)   # obname -> (vertex idx, Vector offset) via dict
+    nudge_vec = {}
+    for key, cl in sorted(clusters.items()):
+        axis, plane, obs = key
+        a_name, b_name = obs
+        r = cl["region"]
+        u_ax, v_ax = [i for i in range(3) if i != axis]
+        # sample the overlap region: centre + quarters
+        samples = []
+        for fu, fv in ((0.5, 0.5), (0.25, 0.25), (0.75, 0.25), (0.25, 0.75), (0.75, 0.75)):
+            p = [0.0, 0.0, 0.0]
+            p[axis] = plane
+            p[u_ax] = r[0] + fu * (r[1] - r[0])
+            p[v_ax] = r[2] + fv * (r[3] - r[2])
+            samples.append(Vector(p))
+        n = Vector((0.0, 0.0, 0.0)); n[axis] = 1.0
+        wins = {a_name: 0, b_name: 0}
+        third = 0
+        for p in samples:
+            for sgn in (1, -1):
+                origin = p + n * (0.12 * sgn)
+                hit, loc, _nrm, _fi, ob_hit, _m = sc.ray_cast(dgl, origin, -n * sgn, distance=0.24)
+                if not hit:
+                    continue
+                if ob_hit.name in wins:
+                    wins[ob_hit.name] += 1
+                else:
+                    third += 1
+        a_seen, b_seen = wins[a_name] > 0, wins[b_name] > 0
+        area = (r[1] - r[0]) * (r[3] - r[2])
+        if a_seen and not b_seen:
+            doomed[b_name] |= cl["members"][b_name]
+            print(f"DEDUPE delete {b_name} behind {a_name} "
+                  f"{'XY'[axis]}~{plane:.2f} area~{area:.2f} faces={len(cl['members'][b_name])}")
+        elif b_seen and not a_seen:
+            doomed[a_name] |= cl["members"][a_name]
+            print(f"DEDUPE delete {a_name} behind {b_name} "
+                  f"{'XY'[axis]}~{plane:.2f} area~{area:.2f} faces={len(cl['members'][a_name])}")
+        elif a_seen and b_seen:
+            # visible from both sides: separate the membranes. Nudge the member
+            # with fewer faces 2.5 mm along its own normal (into its own room).
+            mover = a_name if len(cl["members"][a_name]) <= len(cl["members"][b_name]) else b_name
+            sgns = cl["signs"][mover]
+            sgn = 1 if 1 in sgns and -1 not in sgns else (-1 if -1 in sgns else 0)
+            if sgn == 0:
+                print(f"DEDUPE skip mixed-sign nudge {mover} {'XY'[axis]}~{plane:.2f}")
+                continue
+            off = Vector((0.0, 0.0, 0.0)); off[axis] = 0.0025 * sgn
+            ob = bpy.data.objects[mover]
+            inv = ob.matrix_world.to_3x3().inverted()
+            for fi in cl["members"][mover]:
+                for vi in ob.data.polygons[fi].vertices:
+                    if (mover, vi) not in nudge_vec:
+                        nudge_vec[(mover, vi)] = inv @ off
+                        nudged[mover].add(vi)
+            print(f"DEDUPE nudge {mover} {0.0025*sgn*1000:+.1f}mm {'XY'[axis]}~{plane:.2f} area~{area:.2f}")
+        else:
+            print(f"DEDUPE skip (occluded/inconclusive, third={third}) {a_name}x{b_name} {'XY'[axis]}~{plane:.2f}")
+
+    for obname, fids in doomed.items():
+        ob = bpy.data.objects.get(obname)
+        if not ob or not fids:
+            continue
+        if len(fids) >= len(ob.data.polygons):
+            print(f"DEDUPE refuse to delete ALL faces of {obname}")
+            continue
+        bmd = bmesh.new()
+        bmd.from_mesh(ob.data)
+        bmd.faces.ensure_lookup_table()
+        geom = [bmd.faces[i] for i in fids if i < len(bmd.faces)]
+        bmesh.ops.delete(bmd, geom=geom, context='FACES')
+        bmd.to_mesh(ob.data)
+        bmd.free()
+        print(f"DEDUPE deleted {len(geom)} faces from {obname}")
+    for obname, vids in nudged.items():
+        ob = bpy.data.objects.get(obname)
+        if not ob:
+            continue
+        if obname in doomed and doomed[obname]:
+            # the face deletion above rebuilt this mesh, so the recorded vertex
+            # indices are stale — skip rather than move the wrong vertices
+            print(f"DEDUPE skip nudge on {obname} (had deletions)")
+            continue
+        for vi in vids:
+            ob.data.vertices[vi].co += nudge_vec[(obname, vi)]
+        print(f"DEDUPE nudged {len(vids)} verts in {obname}")
+    bpy.context.view_layer.update()
+
+# Three passes: pass 1 deletes laminated faces but must skip nudges on objects
+# whose face indices it invalidated; pass 2 sees fresh indices, deletes faces
+# newly laminated by the first round and separates surviving membranes; pass 3
+# catches nudges deferred by pass 2 deletions.
+dedupe_coplanar_walls()
+dedupe_coplanar_walls()
+dedupe_coplanar_walls()
+
 # --- NavMesh: shared-lattice grid over the main floor ------------------------
 # Cell walkable when a down-ray finds floor near z=0 and 1.7 m headroom above.
 RES = 0.25
