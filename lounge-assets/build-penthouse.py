@@ -1206,17 +1206,20 @@ SEATS = [
     ("Seat_L2", -4.90, -5.90, 0.78, 90, 0.0, True),
     ("Seat_L3", -3.90, -6.10, 0.78, 180, 0.0, True),
     ("Seat_L4", -3.10, -4.95, 0.78, -90, 0.0, True),
-    # Beds: two upright seated spots each plus a foot-edge seat. These use a
-    # true seated eye height in the client and always preserve world-up.
-    ("Seat_Bed_NW1", -8.65, 6.85, 4.30, 90, 3.52, False),
-    ("Seat_Bed_NW2", -8.65, 7.75, 4.30, 90, 3.52, False),
-    ("Seat_NW", -8.75, 7.30, 4.38, 90, 3.52, False),
-    ("Seat_Bed_NE1", 8.35, 5.65, 4.30, 0, 3.52, False),
-    ("Seat_Bed_NE2", 9.35, 5.65, 4.30, 0, 3.52, False),
-    ("Seat_NE", 8.85, 5.75, 4.38, 0, 3.52, False),
-    ("Seat_Bed_SW1", -8.15, -3.35, 4.30, 90, 3.52, False),
-    ("Seat_Bed_SW2", -8.15, -4.20, 4.30, 90, 3.52, False),
-    ("Seat_SW", -8.20, -3.80, 4.38, 90, 3.52, False),
+    # Beds: two upright seated spots each. These use a true seated eye height
+    # in the client and always preserve world-up.
+    # Positions come from ray-cast mattress height maps (probe-mattress.py):
+    # NW mattress x[-10.75,-8.75] y[6.25,8.50] headboard west; NE mattress
+    # x[7.50,9.75] y[6.50,8.50] with the wardrobe hard against its south end
+    # (seats south of y~6.5 land inside the closet); SW mattress
+    # x[-9.75,-8.00] y[-4.50,-2.75] headboard south. Seats sit on the
+    # mattress facing away from the headboard.
+    ("Seat_Bed_NW1", -9.70, 6.90, 4.30, 90, 3.52, False),
+    ("Seat_Bed_NW2", -9.70, 7.85, 4.30, 90, 3.52, False),
+    ("Seat_Bed_NE1", 8.15, 7.40, 4.30, 180, 3.52, False),
+    ("Seat_Bed_NE2", 9.15, 7.40, 4.30, 180, 3.52, False),
+    ("Seat_Bed_SW1", -9.30, -3.60, 4.30, 180, 3.52, False),
+    ("Seat_Bed_SW2", -8.45, -3.60, 4.30, 180, 3.52, False),
     # SW terrace hot tub, four submerged seats facing the centre. The client
     # uses a 0.70 m seated eye height for these instead of its standing 1.60 m.
     ("Seat_HotTub_N1", -10.28, -6.15, 0.25, 0, 0.05, False),
