@@ -1,29 +1,26 @@
 meta:
-  last_updated: "2026-08-31"
-  purpose: "Operational continuity for the private Quest lounge"
-
+  last_updated: '2026-09-04'
+  purpose: Operational continuity for the private Quest lounge
 current_state:
-  active_task: "Removed the picture frame overlapping the TV; audited Sat Aug 30 session"
-  status: "complete"
-  next_action: "Headset-verify the TV wall is frame-free. If the guest with broken voice returns, their ICE loop (restart every 30s all session) confirms the coturn/TURN task is now blocking."
-  summary: "Deleted the source model's 2.0x1.2 west-wall picture frame (24 faces in Object_64/69 at x=-10.90) that rendered over the TV panel; rebuilt, deployed, checksum-verified live. Sat session audit: servers healthy, hands fix was live, but one guest's dialog transports ICE-restarted every 30s for their whole 73 min (voice likely broken for them) - the known no-TURN case."
-
+  active_task: 'Full interior audit + fix pass: verified art slots, lobby rework, seat surface snapping, connected nav, piano, plants, cylindrical panorama, sky dome, chest-deep hot tub'
+  status: complete
+  next_action: 'Headset-verify on two Quests: sit on a sofa/stool/bed/tub and confirm eye line and the other avatar seated on the cushion; walk lobby -> front door -> vestibule, hall -> library, SW bedroom -> dressing room, NE bedroom -> bath; look at terrace corners (panorama seam softness) and sky; seat icons should appear only within 3.5 m on your own floor.'
+  summary: Blender render sweep of 32 interior stations + two-client Playwright simulation found seated eyes at 2.5 m (avatars floating over sofas), 8 seats with no chair, 60 nav islands, art crossing wall edges/curtains/a glass door, the lobby's fake east wall hiding the real front door, black metals, cube hedges, no sky. All fixed in build-penthouse.py (verified flat-wall art slots, seat surface snapping, nav links + island prune, procedural grand piano, instanced plants/Qing chairs, 8K stitched cylindrical panorama + sky dome) and the client (seated eye heights, per-storey icons, pano view switcher); rebuilt, deployed, re-simulated (all 12 routes walkable, 46 seats at +0.75 m eye, tub eye 0.39 m above water, 0 client errors).
 pending_tasks:
-  - task: "Run a two-Quest headset soak test covering the corrected tub/bed seats, movement, controller tracking loss, voice, foreground loss, view switching, and a brief Wi-Fi interruption while capturing client logs."
-    priority: "high"
-  - task: "Add coturn/TURN if remote-network testing still cannot establish media through the direct public/LAN candidates."
-    priority: "medium"
-  - task: "Revisit further mesh and draw-call optimization only if tonight's headset profiling still shows frame pressure."
-    priority: "medium"
-
+- task: Headset soak test of the new seating, walk routes, panorama corners and sky; report any seat that still feels off (Seat_T1/T6 wicker chairs verified by surface cluster only).
+  priority: high
+- task: Add coturn/TURN if remote-network testing still cannot establish media through the direct public/LAN candidates.
+  priority: medium
+- task: Kitchen cabinets and the gym remain plain source-model finishes; restyle only if they bother in headset.
+  priority: low
 session_history:
-  - date: "2026-08-31"
-    summary: "Removed the west-wall picture frame that overlapped the TV panel (24 faces), redeployed and checksum-verified; audited Sat session: servers clean, one guest stuck in a 30s ICE-restart loop all night (needs TURN)."
-  - date: "2026-08-30"
-    summary: "Fixed and deployed: hand-tracking sources ignored + buttons neutralized on tracking loss, TVScreen ray-snapped proud of the west wall with buttons anchored to it, coplanar strobing wall faces deleted; build, probes, audit and live checksums all verified."
-  - date: "2026-08-29"
-    summary: "Diagnosed meetup glitches: hand tracking registered as fake controllers (pinch=teleport, latched trigger on tracking loss), cabin-era tv.js coordinates hide the shared screen behind the penthouse wall; servers verified healthy, piano geometry verified clean."
-  - date: "2026-08-22"
-    summary: "Committed and pushed all current changes across the main lounge, Hubs, Dialog, and Reticulum repositories after passing the Hubs hook checks in Docker."
-  - date: "2026-08-21"
-    summary: "Added true seated eye heights for the hot tub, replaced six sideways bed targets with upright seats, rebuilt and deployed, and checksum-verified the public model and client."
+- date: '2026-09-04'
+  summary: 'Full audit/fix pass: seat waypoints onto real cushions with seated eye height, nav mesh to one component (library, dressing, bath, front door), art on verified flat walls, lobby rebuilt around the real front door, piano + plants + Qing chairs, 8K cylindrical panorama + sky dome, chest-deep hot tub; deployed and Playwright-verified.'
+- date: '2026-09-04'
+  summary: Fixed white seat-marker blobs (always-on bed/tub sprites -> 3.5 m proximity reveal for all seats) and moved all six bed seats onto ray-cast mattress surfaces (NE pair was inside the wardrobe); rebuilt model + client, committed.
+- date: '2026-09-04'
+  summary: Fixed stuck teleport arc (masked stopTeleport falling edge -> level-triggered bindings in teleporting sets), thumb-touch-gated movement/snap-turn against stick drift, generic 3-pass coplanar wall dedupe (362 faces), all window views re-derived at 2K+ (Central Park 2560) with mipmaps; rebuilt, committed, deployed.
+- date: '2026-08-31'
+  summary: 'Removed the west-wall picture frame that overlapped the TV panel (24 faces), redeployed and checksum-verified; audited Sat session: servers clean, one guest stuck in a 30s ICE-restart loop all night (needs TURN).'
+- date: '2026-08-30'
+  summary: 'Fixed and deployed: hand-tracking sources ignored + buttons neutralized on tracking loss, TVScreen ray-snapped proud of the west wall with buttons anchored to it, coplanar strobing wall faces deleted; build, probes, audit and live checksums all verified.'

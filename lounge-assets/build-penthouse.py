@@ -4,7 +4,7 @@
 # and adds the Hubs anchor nodes (spawns, seats, TV/monitor screens, view
 # backdrop). MOZ_hubs_components are injected afterwards by inject-hubs.mjs.
 #
-# Usage: blender -b --factory-startup -P build-penthouse.py -- <src.glb> <out.glb> <viewimg>
+# Usage: blender -b --factory-startup -P build-penthouse.py -- <src.glb> <out.glb> <bake/day-pano.jpg>
 import bpy, bmesh, sys, math
 from mathutils import Vector
 
@@ -55,6 +55,28 @@ def region_delete(x1, x2, y1, y2, z1, z2):
     print(f"REGION-DELETE ({x1},{y1})..({x2},{y2}): {total} faces")
 
 region_delete(-5.6, 6.2, 9.68, 10.12, -0.3, 10.6)
+
+def region_delete_mats(x1, x2, y1, y2, z1, z2, mats, label):
+    total = 0
+    for ob in [o for o in sc.collection.all_objects if o.type == 'MESH']:
+        idx = {i for i, m in enumerate(ob.data.materials) if m and m.name in mats}
+        if not idx:
+            continue
+        mw = ob.matrix_world
+        bmr = bmesh.new()
+        bmr.from_mesh(ob.data)
+        doomed = []
+        for f in bmr.faces:
+            c = mw @ f.calc_center_median()
+            if f.material_index in idx and x1 < c.x < x2 and y1 < c.y < y2 and z1 < c.z < z2:
+                doomed.append(f)
+        if doomed:
+            bmesh.ops.delete(bmr, geom=doomed, context='FACES')
+            bmr.to_mesh(ob.data)
+            total += len(doomed)
+        bmr.free()
+    bpy.context.view_layer.update()
+    print(f"REGION-DELETE-MATS {label}: {total} faces")
 
 # --- Delete the two mannequin silhouettes (patio + front door) ---------------
 # Down-cast a small disc around each figure; every hit face seeds a linked-
@@ -258,6 +280,9 @@ WALL_COLORS = {
     "fake_mat_104_101_99_255": srgb("3A2A1E"),          # stools/side pieces -> espresso
     "fake_mat_196_192_184_255": srgb("55603E"),         # patio bench/cushion greys -> olive
     "fake_mat_157_154_155_255": srgb("2F5D5A"),         # media sofa greys -> deep teal
+    # Closed-blind rollers/valances (Object_69/70) were near-black boxes at
+    # every window head and read as unfinished; finish them as espresso wood.
+    "fake_mat_6_5_5_255": srgb("3A2A1E"),
 }
 for mname, col in WALL_COLORS.items():
     m = bpy.data.materials.get(mname)
@@ -562,10 +587,13 @@ def mk(name, hexcol, rough, metal=0.0):
 M_WALL   = mk('LobbyWall',  'A08B6F', 0.85)          # warm plaster
 M_STONE  = mk('LobbyStone', '8F8578', 0.38)          # honed stone floor
 M_DARK   = mk('TrimDark',   '2A2320', 0.5)
-M_BRASS  = mk('LobbyBrass', '8C6F3F', 0.35, 0.9)
-M_STEEL  = mk('LiftSteel',  '6E6A63', 0.3, 0.9)
+# Metallic 0.9 renders near-black in the headset (no environment map), so the
+# lift doors and brass read as unfinished voids. Mid metallic + lighter base
+# keeps a brushed look under the point lights.
+M_BRASS  = mk('LobbyBrass', 'B08A45', 0.35, 0.45)
+M_STEEL  = mk('LiftSteel', '9A958C', 0.32, 0.35)
 M_DECK   = mk('DeckWood',   '6E4E32', 0.68)
-M_RAIL   = mk('RailDark',   '23262B', 0.4, 0.6)
+M_RAIL   = mk('RailDark',   '23262B', 0.4, 0.25)
 M_CUSH   = mk('LoungeCush', '3E5C54', 0.85)
 M_OAK    = mk('DenOak',     '5C4630', 0.6)
 M_WINE   = mk('RugWine',    '6E2B33', 0.95)
@@ -573,8 +601,72 @@ M_GLOW   = mk('WarmGlow',   '2A2320', 0.5)
 _gb = M_GLOW.node_tree.nodes['Principled BSDF']
 if _gb.inputs.get('Emission Color'):
     _gb.inputs['Emission Color'].default_value = (1.0, 0.82, 0.55, 1)
-    _gb.inputs['Emission Strength'].default_value = 2.5
+    _gb.inputs['Emission Strength'].default_value = 1.4
 M_GLASSP = bpy.data.materials.get('fake_mat_255_255_255_32')  # model's own glass
+
+# --- Copy a box-region of the source model into a reusable mesh -------------
+# Used to instance real furniture/plants (with their styled materials) where
+# the build previously stood crude primitives.
+def copy_region_to_object(name, x1, x2, y1, y2, z1, z2, only_mats=None,
+                          exclude_prefix=("Object_32", "NavMesh", "Art_", "View", "Lobby", "Terr", "Ledge")):
+    me = bpy.data.meshes.new(name)
+    bmc = bmesh.new()
+    uv_layer = bmc.loops.layers.uv.new("UVMap")
+    slots = []
+    cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+    faces_n = 0
+    for ob in [o for o in sc.collection.all_objects if o.type == 'MESH' and not o.name.startswith(exclude_prefix)]:
+        mw = ob.matrix_world
+        mats = ob.data.materials
+        src_uv = ob.data.uv_layers.active.data if ob.data.uv_layers.active else None
+        for poly in ob.data.polygons:
+            c = mw @ poly.center
+            if not (x1 < c.x < x2 and y1 < c.y < y2 and z1 < c.z < z2):
+                continue
+            m = mats[poly.material_index] if mats and poly.material_index < len(mats) else None
+            if only_mats is not None and (m is None or m.name not in only_mats):
+                continue
+            if m is None:
+                m = M_DARK
+            if m not in slots:
+                slots.append(m)
+            vs = []
+            for vi in poly.vertices:
+                wv = mw @ ob.data.vertices[vi].co
+                vs.append(bmc.verts.new((wv.x - cx, wv.y - cy, wv.z - z1)))
+            try:
+                fc = bmc.faces.new(vs)
+                fc.material_index = slots.index(m)
+                # keep the source UVs so textured pots/soil/frames still sample
+                if src_uv is not None:
+                    for loop, li in zip(fc.loops, poly.loop_indices):
+                        loop[uv_layer].uv = src_uv[li].uv
+                faces_n += 1
+            except ValueError:
+                pass
+    # Do not weld: merged vertices would smear UV seams across the copy.
+    bmc.to_mesh(me)
+    bmc.free()
+    for m in slots:
+        me.materials.append(m)
+    print(f"COPY {name}: {faces_n} faces, {len(slots)} materials")
+    if faces_n < 20:
+        raise RuntimeError(f"COPY {name}: region is empty ({faces_n} faces)")
+    return me
+
+def place_copy(name, me, x, y, z, yaw=0.0, scale=1.0):
+    o = bpy.data.objects.new(name, me)
+    o.location = (x, y, z)
+    o.rotation_euler = (0, 0, yaw)
+    o.scale = (scale, scale, scale)
+    sc.collection.objects.link(o)
+    return o
+
+# The ivory-planter shrub on the patio (foliage islands already jittered
+# green + soil + pot) becomes the house plant for every former cube hedge.
+PLANT_ME = copy_region_to_object("PlantSrc", 6.10, 6.80, 9.05, 9.70, 0.02, 1.0)
+def plant(name, x, y, z, scale=1.25, yaw=0.0):
+    return place_copy(name, PLANT_ME, x, y, z, yaw, scale)
 
 # Preserve the source door slabs, frames and surrounding walls. Movement uses
 # the navigation links below and does not require visually carving the model.
@@ -593,7 +685,7 @@ recolor_region(3.8, 7.7, -10.3, -6.0, 2.55, 6.8, "8A8378", rough=0.85, label="Fa
                only_mats={'fake_mat_35_32_34_255', 'fake_mat_6_5_5_255'})
 # Finish the remaining source black shell inside the occupied building.
 # Purpose-built dark furniture and trim use new materials and are unaffected.
-recolor_region(-11.7, 11.7, -10.1, 10.1, -0.3, 6.7, "8A8378", rough=0.85,
+recolor_region(-14.0, 14.0, -11.0, 10.6, -0.3, 7.2, "8A8378", rough=0.85,
                label="LegacyBlackFinish", only_mats=FACADE)
 
 # Teal mannequin hands still float by the vestibule glass door: delete small
@@ -649,35 +741,72 @@ region_delete(-3.62, -2.05, -9.85, -7.68, 0.02, 2.78)
 region_delete(-3.35, -2.88, -9.85, -6.72, 0.02, 3.10)
 
 # --- Elevator lobby (x -7.62..-0.58, y -6.62..-9.76) --------------------------
-add_box("LobbyFloor", -4.10, -8.19, 0.02, 3.52, 1.57, 0.02, M_STONE)
-add_box("LobbyCeil",  -4.10, -8.19, 2.98, 3.52, 1.57, 0.04, M_WALL)
-add_box("LobbyGlow",  -4.10, -8.19, 2.93, 1.30, 0.45, 0.015, M_GLOW)
+# The source vestibule's west wall (green plaster + the glass front door,
+# x -1.3..-1.1) is the lobby's east boundary; everything the lobby adds stops
+# at x = -1.32 so nothing pokes through into the vestibule.
+add_box("LobbyFloor", -4.47, -8.19, 0.02, 3.15, 1.57, 0.02, M_STONE)
+add_box("LobbyCeil",  -4.47, -8.19, 2.98, 3.15, 1.57, 0.04, M_WALL)
+add_box("LobbyGlow",  -4.47, -8.19, 2.93, 1.30, 0.45, 0.015, M_GLOW)
 # North wall: solid runs with one doorway aligned to the real passage between
 # the library block's west end and the piano room (open x -6.9..-5.3). Wall
 # face sits just south of the noir library face and hides it.
 add_box("LobbyWallN1", -7.11, -6.57, 1.475, 0.51, 0.03, 1.475, M_WALL)
-add_box("LobbyWallN2", -3.04, -6.57, 1.475, 2.46, 0.03, 1.475, M_WALL)
+add_box("LobbyWallN2", -3.41, -6.57, 1.475, 2.09, 0.03, 1.475, M_WALL)
 add_box("LobbyDoorHead", -6.05, -6.57, 2.775, 0.55, 0.03, 0.175, M_WALL)
 # South wall (elevator bank), full run.
-add_box("LobbyWallS", -4.10, -9.73, 1.475, 3.52, 0.03, 1.475, M_WALL)
-# East wall against the vestibule; west wall with a doorway to the SW terrace.
-# East wall has a real 1.26 m doorway into the vestibule.
-add_box("LobbyWallE_N", -0.60, -7.07, 1.475, 0.03, 0.45, 1.475, M_WALL)
-add_box("LobbyWallE_S", -0.60, -9.27, 1.475, 0.03, 0.49, 1.475, M_WALL)
-add_box("LobbyWallE_Head", -0.60, -8.15, 2.785, 0.03, 0.63, 0.165, M_WALL)
-# Complete wood door in the former lobby opening. It is intentionally visual
-# only; the linked navigation surface preserves the lounge's pass-through.
-add_box("LobbyDoorPanel", -0.60, -8.15, 1.20, 0.035, 0.58, 1.20, M_OAK)
-add_box("LobbyDoorJambN", -0.62, -7.53, 1.32, 0.055, 0.045, 1.32, M_DARK)
-add_box("LobbyDoorJambS", -0.62, -8.77, 1.32, 0.055, 0.045, 1.32, M_DARK)
-add_box("LobbyDoorJambTop", -0.62, -8.15, 2.58, 0.055, 0.66, 0.06, M_DARK)
-add_box("LobbyDoorHandle", -0.555, -7.72, 1.12, 0.025, 0.025, 0.07, M_BRASS)
+add_box("LobbyWallS", -4.47, -9.73, 1.475, 3.15, 0.03, 1.475, M_WALL)
+# The apartment's real front door is the glass leaf in the vestibule wall at
+# y -8.05..-6.95 (frame Object_67, pane Object_61). A previous build stood a
+# plaster wall + oak door 0.6 m INSIDE the vestibule, hiding it, and bridged
+# the nav mesh straight through the glass. Remove the pane so the framed
+# opening is a walkable doorway between the lobby and the vestibule.
+region_delete_mats(-1.28, -1.12, -8.08, -6.92, 0.02, 2.5, {'fake_mat_255_255_255_32'}, "front-door-pane")
+# The source's front-door canopy (a sloped camel slab on an olive/grey post
+# and beam, with green side panels) stands inside the lobby's east end and
+# showed as coloured wedges at the ceiling corner and a post in front of the
+# gallery wall. Its slab triangles are large, so delete any face of those
+# materials that TOUCHES the lobby volume (x < -1.33 keeps the vestibule's
+# green wall and the front-door frame at x >= -1.3 intact).
+def region_delete_mats_touch(x1, x2, y1, y2, z1, z2, mats, label):
+    total = 0
+    for ob in [o for o in sc.collection.all_objects if o.type == 'MESH' and not o.name.startswith(("Lobby", "Lift", "Art_", "Plant"))]:
+        idx = {i for i, m in enumerate(ob.data.materials) if m and m.name in mats}
+        if not idx:
+            continue
+        mw = ob.matrix_world
+        bmr = bmesh.new()
+        bmr.from_mesh(ob.data)
+        doomed = []
+        for f in bmr.faces:
+            if f.material_index not in idx:
+                continue
+            # vertices, edge midpoints and the centre: a tall sliver whose
+            # vertices straddle the box still counts as touching it
+            samples = [v.co for v in f.verts] + [(e.verts[0].co + e.verts[1].co) * 0.5 for e in f.edges] + [f.calc_center_median()]
+            for co in samples:
+                w = mw @ co
+                if x1 < w.x < x2 and y1 < w.y < y2 and z1 < w.z < z2:
+                    doomed.append(f)
+                    break
+        if doomed:
+            bmesh.ops.delete(bmr, geom=doomed, context='FACES')
+            bmr.to_mesh(ob.data)
+            total += len(doomed)
+        bmr.free()
+    bpy.context.view_layer.update()
+    print(f"REGION-DELETE-TOUCH {label}: {total} faces")
+
+region_delete_mats_touch(-3.6, -1.33, -9.9, -6.3, 0.03, 3.05,
+                         {'fake_mat_251_251_251_255', 'fake_mat_196_192_184_255',
+                          'fake_mat_69_64_65_255', 'fake_mat_230_220_187_255'}, "lobby-canopy")
+region_delete_mats(-3.6, -1.33, -9.9, -6.3, 1.90, 3.05, {'beige_006_Wall_Entity_Material'}, "lobby-canopy-green")
+# West wall with a doorway to the SW terrace.
 add_box("LobbyWallW1", -7.62, -7.435, 1.475, 0.03, 0.815, 1.475, M_WALL)
 add_box("LobbyWallW2", -7.62, -9.505, 1.475, 0.03, 0.255, 1.475, M_WALL)
 add_box("LobbyWallWHead", -7.62, -8.775, 2.775, 0.03, 0.475, 0.175, M_WALL)
 # Baseboards on the long walls.
-add_box("LobbyBaseN", -2.765, -6.605, 0.10, 2.185, 0.012, 0.06, M_DARK)
-add_box("LobbyBaseS", -4.10, -9.695, 0.10, 3.52, 0.012, 0.06, M_DARK)
+add_box("LobbyBaseN", -3.135, -6.605, 0.10, 1.815, 0.012, 0.06, M_DARK)
+add_box("LobbyBaseS", -4.47, -9.695, 0.10, 3.15, 0.012, 0.06, M_DARK)
 # Elevator bank: two brass-framed cars with steel leaves + glow slits.
 for i, ex in enumerate((-6.1, -3.9)):
     add_box(f"LiftFrame{i}", ex, -9.705, 1.18, 0.75, 0.022, 1.18, M_BRASS)
@@ -687,21 +816,12 @@ for i, ex in enumerate((-6.1, -3.9)):
     add_box(f"LiftHall{i}", ex, -9.695, 2.46, 0.30, 0.014, 0.045, M_GLOW)
 add_box("LiftCall", -5.0, -9.71, 1.08, 0.045, 0.014, 0.09, M_BRASS)
 add_box("LiftCallDot", -5.0, -9.695, 1.08, 0.018, 0.012, 0.018, M_GLOW)
-# Console + mirror on the north wall; runner on the stone.
-add_box("LobbyConsole", -3.6, -6.85, 0.85, 0.50, 0.16, 0.018, M_DARK)
-add_box("LobbyConsL", -4.02, -6.85, 0.425, 0.02, 0.13, 0.425, M_DARK)
-add_box("LobbyConsR", -3.18, -6.85, 0.425, 0.02, 0.13, 0.425, M_DARK)
-add_box("LobbyMirrorFrame", -3.6, -6.635, 1.72, 0.48, 0.012, 0.60, M_BRASS)
-mirror = mk('MirrorGlass', '1A1D22', 0.05, 0.9)
-add_box("LobbyMirror", -3.6, -6.62, 1.72, 0.44, 0.008, 0.56, mirror)
-add_box("LobbyRug", -4.1, -8.19, 0.048, 2.60, 0.55, 0.008, M_WINE)
-# Topiary pair in the lobby corners.
-def hedge(name, hx, hy, hz):
-    add_box(name + "Pot", hx, hy, hz + 0.20, 0.24, 0.24, 0.20, M_RAIL)
-    fol = bpy.data.materials.get('Foliage_1') or M_CUSH
-    add_box(name + "Top", hx, hy, hz + 0.60, 0.21, 0.21, 0.20, fol)
-hedge("LobbyHedgeW", -7.15, -9.35, 0.04)
-hedge("LobbyHedgeE", -1.15, -9.35, 0.04)
+# Runner on the stone. (The former console/mirror rendered as a black slab in
+# the headset and crowded the gallery wall; the art now hangs at eye level.)
+add_box("LobbyRug", -4.47, -8.19, 0.048, 2.60, 0.55, 0.008, M_WINE)
+# Potted plants in the lobby corners.
+plant("LobbyPlantW", -7.05, -9.3, 0.04, 1.2, 0.4)
+plant("LobbyPlantE", -1.75, -9.3, 0.04, 1.2, 2.1)
 
 # --- SW terrace: accessible four-person hot tub ------------------------------
 add_box("DeckSW", -9.57, -7.10, 0.07, 1.85, 2.66, 0.03, M_DECK)
@@ -743,8 +863,8 @@ for i, (dx, dy, rr) in enumerate(((-0.42, 0.18, 0.035), (-0.12, -0.31, 0.025),
                                         location=(tub_x + dx, tub_y + dy, 0.595))
     bpy.context.active_object.name = f"HotTubBubble_{i}"
     bpy.context.active_object.data.materials.append(M_TUB)
-hedge("TerrSWhedge1", -8.2, -4.75, 0.04)
-hedge("TerrSWhedge2", -11.0, -4.75, 0.04)
+plant("TerrSWplant1", -8.2, -4.75, 0.04, 1.5, 0.8)
+plant("TerrSWplant2", -11.0, -4.75, 0.04, 1.5, 2.6)
 for i, (bx, by) in enumerate(((-11.15, -9.45), (-7.95, -9.45), (-11.15, -4.75))):
     add_box(f"BollSW{i}", bx, by, 0.32, 0.045, 0.045, 0.32, M_RAIL)
     add_box(f"BollSWg{i}", bx, by, 0.60, 0.05, 0.05, 0.028, M_GLOW)
@@ -772,9 +892,9 @@ for i, (cy2, backy) in enumerate(((-6.55, -6.28), (-8.05, -8.32))):
     add_box(f"BistroSeat{i}", 9.5, cy2, 0.47, 0.21, 0.21, 0.03, M_CUSH)
     add_box(f"BistroPlinth{i}", 9.5, cy2, 0.25, 0.17, 0.17, 0.19, M_DARK)
     add_box(f"BistroBack{i}", 9.5, backy, 0.67, 0.21, 0.025, 0.17, M_DARK)
-hedge("TerrSEhedge1", 8.0, -4.75, 0.04)
-hedge("TerrSEhedge2", 9.5, -4.75, 0.04)
-hedge("TerrSEhedge3", 11.0, -4.75, 0.04)
+plant("TerrSEplant1", 8.0, -4.75, 0.04, 1.5, 1.2)
+plant("TerrSEplant2", 9.5, -4.75, 0.04, 1.5, 3.0)
+plant("TerrSEplant3", 11.0, -4.75, 0.04, 1.5, 0.5)
 for i, (bx, by) in enumerate(((11.15, -9.45), (3.3, -9.45), (11.15, -4.85))):
     add_box(f"BollSE{i}", bx, by, 0.32, 0.045, 0.045, 0.32, M_RAIL)
     add_box(f"BollSEg{i}", bx, by, 0.60, 0.05, 0.05, 0.028, M_GLOW)
@@ -794,11 +914,108 @@ cushA = mk('CushMustard', 'C99A3C', 0.9)
 cushB = mk('CushRust', 'B0562F', 0.9)
 add_box("DenCush1", 0.25, -7.95, DEN_Z + 0.07, 0.28, 0.28, 0.055, cushA)
 add_box("DenCush2", 2.55, -7.95, DEN_Z + 0.07, 0.28, 0.28, 0.055, cushB)
-add_box("DenGlow", 1.5, -8.45, 6.20, 0.90, 0.35, 0.014, M_GLOW)
+add_box("DenGlow", 1.5, -8.45, 6.20, 0.55, 0.22, 0.014, M_GLOW)
 # Green on the flanking roof ledges, seen through the den's glass walls.
-hedge("LedgeW1", -1.5, -7.8, DEN_Z)
-hedge("LedgeW2", -1.5, -9.2, DEN_Z)
-hedge("LedgeE1", 4.2, -8.5, DEN_Z)
+# The corridor from the gym runs down the den's west glass to its door at
+# (-0.75, -8.05); keep the west plant south of that approach.
+plant("LedgeW2", -1.45, -9.45, DEN_Z, 1.2, 1.7)
+plant("LedgeE1", 4.2, -8.5, DEN_Z, 1.4, 2.9)
+
+# ===================== FURNITURE: LIBRARY CHAIRS + GRAND PIANO ================
+# Library: the "reading group" seats sat inside the bookshelves — the room has
+# no chairs at all. Instance the dining room's Qing chair (charcoal frame, red
+# seat) as a facing pair with a small side table.
+QING_ME = copy_region_to_object("QingSrc", 7.55, 8.32, 4.35, 5.15, 0.02, 1.3,
+                                only_mats={'fake_mat_35_32_34_255', 'qing_style_chair___qing_style_chairmaterial__28'})
+place_copy("LibChairW", QING_ME, -4.55, -5.30, 0.0, 0.0)       # faces +x like the source chair
+place_copy("LibChairE", QING_ME, -3.55, -5.30, 0.0, math.pi)   # faces -x
+bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.24, depth=0.03, location=(-4.05, -5.82, 0.52))
+bpy.context.active_object.name = "LibTableTop"
+bpy.context.active_object.data.materials.append(M_DARK)
+bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.03, depth=0.50, location=(-4.05, -5.82, 0.26))
+bpy.context.active_object.name = "LibTableStem"
+bpy.context.active_object.data.materials.append(M_RAIL)
+bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.16, depth=0.02, location=(-4.05, -5.82, 0.02))
+bpy.context.active_object.name = "LibTableBase"
+bpy.context.active_object.data.materials.append(M_RAIL)
+
+# Grand piano: the source piano was unusable and its corner was left as a bare
+# white disc. A black-lacquer baby grand (propped lid, ivory keys, bench with
+# a seat waypoint) rebuilt from a traced grand outline.
+M_LACQ = mk('PianoLacquer', '0A0A0C', 0.16)
+M_IVORY = mk('PianoIvory', 'EFE4CD', 0.5)
+M_FELT = mk('PianoFelt', '6E2B33', 0.9)
+recolor_region(-10.4, -5.8, -3.4, 1.4, 0.005, 0.07, "6E2B33", rough=0.95, label="PianoRug", only_mats={'moquette_019'})
+
+def prism(name, pts, z0, h, mat, parent, loc=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0)):
+    me = bpy.data.meshes.new(name)
+    bp = bmesh.new()
+    vs = [bp.verts.new((x, y, z0)) for x, y in pts]
+    f = bp.faces.new(vs)
+    r = bmesh.ops.extrude_face_region(bp, geom=[f])
+    top = [g for g in r['geom'] if isinstance(g, bmesh.types.BMVert)]
+    bmesh.ops.translate(bp, vec=(0, 0, h), verts=top)
+    bmesh.ops.recalc_face_normals(bp, faces=bp.faces[:])
+    bp.to_mesh(me)
+    bp.free()
+    me.materials.append(mat)
+    o = bpy.data.objects.new(name, me)
+    o.parent = parent
+    o.location = loc
+    o.rotation_euler = rot
+    sc.collection.objects.link(o)
+    return o
+
+def part_box(name, parent, x, y, z, sx, sy, sz, mat):
+    bpy.ops.mesh.primitive_cube_add(location=(0, 0, 0))
+    o = bpy.context.active_object
+    o.name = name
+    o.scale = (sx, sy, sz)
+    o.data.materials.append(mat)
+    o.parent = parent
+    o.location = (x, y, z)
+    return o
+
+def grand_outline(shrink=0.0):
+    # keyboard edge along local y=0 (x -0.75..0.75), tail toward +y, treble +x
+    pts = [(-0.75 + shrink, 0.0 + shrink), (0.75 - shrink, 0.0 + shrink), (0.75 - shrink, 0.6)]
+    a, b = 0.80 - shrink, 1.25 - shrink
+    for k in range(1, 13):
+        th = math.radians(150 * k / 12)
+        pts.append((-0.05 + a * math.cos(th), 0.6 + b * math.sin(th)))
+    pts.append((-0.75 + shrink, 0.6 + b * math.sin(math.radians(150))))
+    return pts
+
+PIANO_X, PIANO_Y, PIANO_YAW = -8.05, -1.25, math.pi / 2   # keyboard east, tail to the window
+pno = bpy.data.objects.new("Pno_Root", None)
+pno.location = (PIANO_X, PIANO_Y, 0.0)
+pno.rotation_euler = (0, 0, PIANO_YAW)
+sc.collection.objects.link(pno)
+prism("Pno_Body", grand_outline(), 0.66, 0.30, M_LACQ, pno)
+prism("Pno_Soundboard", grand_outline(0.04), 0.90, 0.005, M_FELT, pno)
+# Lid hinged on the bass (local -x) side, propped open 35 degrees.
+lid_pts = [(x + 0.75, y) for x, y in grand_outline(0.02)]
+prism("Pno_Lid", lid_pts, 0.0, 0.03, M_LACQ, pno, loc=(-0.75, 0.0, 0.965), rot=(0, math.radians(-35), 0))
+part_box("Pno_LidProp", pno, 0.52, 0.85, 1.28, 0.012, 0.012, 0.33, M_LACQ)
+part_box("Pno_KeyBed", pno, 0.0, -0.13, 0.80, 0.74, 0.14, 0.035, M_LACQ)
+part_box("Pno_WhiteKeys", pno, 0.0, -0.14, 0.838, 0.68, 0.12, 0.006, M_IVORY)
+part_box("Pno_BlackKeys", pno, 0.0, -0.075, 0.852, 0.66, 0.045, 0.009, M_LACQ)
+part_box("Pno_CheekL", pno, -0.71, -0.13, 0.86, 0.035, 0.14, 0.06, M_LACQ)
+part_box("Pno_CheekR", pno, 0.71, -0.13, 0.86, 0.035, 0.14, 0.06, M_LACQ)
+part_box("Pno_Fallboard", pno, 0.0, -0.005, 0.90, 0.72, 0.045, 0.045, M_LACQ)
+part_box("Pno_MusicDesk", pno, 0.0, 0.32, 1.08, 0.30, 0.012, 0.11, M_LACQ)
+for i, (lx, ly) in enumerate(((0.60, 0.18), (-0.60, 0.18), (-0.45, 1.05))):
+    part_box(f"Pno_Leg{i}", pno, lx, ly, 0.33, 0.045, 0.045, 0.33, M_LACQ)
+part_box("Pno_Lyre", pno, 0.0, 0.25, 0.30, 0.02, 0.02, 0.30, M_LACQ)
+part_box("Pno_Pedals", pno, 0.0, 0.20, 0.06, 0.12, 0.05, 0.015, M_BRASS)
+# Bench: lacquer frame, wine felt top; the pianist's seat waypoint sits on it.
+part_box("Pno_BenchTop", pno, 0.0, -0.62, 0.475, 0.46, 0.18, 0.025, M_FELT)
+part_box("Pno_BenchFrame", pno, 0.0, -0.62, 0.44, 0.44, 0.16, 0.012, M_LACQ)
+for i, (lx, ly) in enumerate(((0.40, -0.48), (-0.40, -0.48), (0.40, -0.76), (-0.40, -0.76))):
+    part_box(f"Pno_BenchLeg{i}", pno, lx, ly, 0.215, 0.022, 0.022, 0.215, M_LACQ)
+bpy.context.view_layer.update()
+PIANO_SEAT = pno.matrix_world @ Vector((0.0, -0.62, 0.0))
+print(f"PIANO at ({PIANO_X},{PIANO_Y}); bench seat at ({PIANO_SEAT.x:.2f},{PIANO_SEAT.y:.2f})")
 
 # --- Decimate to budget ------------------------------------------------------
 dg = bpy.context.evaluated_depsgraph_get()
@@ -995,6 +1212,142 @@ dedupe_coplanar_walls()
 dedupe_coplanar_walls()
 dedupe_coplanar_walls()
 
+# --- Seats: authored spots, snapped onto the real seat surfaces --------------
+# name, x, y, expected seat-surface z, yaw_deg
+# yaw: avatar facing after glTF export (empty -Y): 0=-y  90=+x  180=+y  -90=-x
+# The waypoint is placed ON the cushion/mattress/pad surface; the client adds
+# a 0.60 m seated eye height (0.70 in the tub) plus its 0.15 m occupied lift.
+SEATS = [
+    # Lounge sofa (north arm, facing the room)
+    ("Seat_A1", -9.6, 8.15, 0.43, 0),
+    ("Seat_A2", -8.6, 8.15, 0.43, 0),
+    ("Seat_A3", -7.6, 8.15, 0.43, 0),
+    # Bar stools
+    ("Seat_B1", 9.28, -0.41, 0.76, 0),
+    ("Seat_B2", 9.88, -0.41, 0.76, 0),
+    ("Seat_B3", 10.49, -0.41, 0.76, 0),
+    # Lounge ottoman, facing the TV wall
+    ("Seat_Ott", -9.40, 4.55, 0.36, -90),
+    # Formal dining — eight Qing chairs
+    ("Seat_D1", 7.98, 4.75, 0.456, 90),
+    ("Seat_D2", 7.98, 5.44, 0.456, 90),
+    ("Seat_D3", 7.98, 6.46, 0.456, 90),
+    ("Seat_D4", 7.98, 7.34, 0.456, 90),
+    ("Seat_D5", 9.62, 4.95, 0.456, -90),
+    ("Seat_D6", 9.62, 5.70, 0.456, -90),
+    ("Seat_D7", 9.62, 6.41, 0.456, -90),
+    ("Seat_D8", 9.62, 7.35, 0.456, -90),
+    # Terrace dining table (eight wicker chairs)
+    ("Seat_T1", 4.66, 5.49, 0.48, -90),
+    ("Seat_T2", 4.66, 6.19, 0.48, -90),
+    ("Seat_T3", 4.66, 6.97, 0.48, -90),
+    ("Seat_T4", 4.66, 7.60, 0.48, -90),
+    ("Seat_T5", 3.40, 7.07, 0.48, 90),
+    ("Seat_T6", 3.40, 7.63, 0.48, 90),
+    ("Seat_T7", 3.40, 5.49, 0.48, 90),
+    ("Seat_T8", 3.40, 6.19, 0.48, 90),
+    # Terrace L-sofa (west arm faces the view band, south arm faces north)
+    ("Seat_P1", -3.55, 5.80, 0.36, 90),
+    ("Seat_P2", -3.55, 6.90, 0.36, 90),
+    ("Seat_P3", -3.55, 7.95, 0.36, 90),
+    ("Seat_P4", -2.60, 5.50, 0.36, 180),
+    ("Seat_P5", -1.30, 5.50, 0.36, 180),
+    # Library reading pair (instanced Qing chairs)
+    ("Seat_L1", -4.55, -5.30, 0.456, 90),
+    ("Seat_L2", -3.55, -5.30, 0.456, -90),
+    # Beds: two upright seated spots each, on the mattress facing away from
+    # the headboard (mattress surfaces from probe-mattress.py).
+    ("Seat_Bed_NW1", -9.70, 6.90, 4.15, 90),
+    ("Seat_Bed_NW2", -9.70, 7.85, 4.15, 90),
+    ("Seat_Bed_NE1", 8.15, 7.40, 4.15, 180),
+    ("Seat_Bed_NE2", 9.15, 7.40, 4.15, 180),
+    ("Seat_Bed_SW1", -9.30, -3.60, 4.15, 180),
+    ("Seat_Bed_SW2", -8.45, -3.60, 4.15, 180),
+    # SW terrace hot tub: four submerged seats facing the centre (not snapped).
+    # Water surface is z 0.555; with the client's 0.70 m tub eye height and
+    # 0.15 m occupied lift the eye lands at 0.95, i.e. 0.40 m above the water,
+    # so the water reaches a seated avatar's chest.
+    ("Seat_HotTub_N1", -10.28, -6.15, 0.10, 0),
+    ("Seat_HotTub_N2", -9.22, -6.15, 0.10, 0),
+    ("Seat_HotTub_S1", -10.28, -8.15, 0.10, 180),
+    ("Seat_HotTub_S2", -9.22, -8.15, 0.10, 180),
+    # SE terrace bistro pair
+    ("Seat_E1", 9.50, -6.55, 0.50, 0),
+    ("Seat_E2", 9.50, -8.05, 0.50, 180),
+    # Sky den sofa
+    ("Seat_S1", 0.60, -9.22, 3.87, 180),
+    ("Seat_S2", 1.40, -9.22, 3.87, 180),
+    ("Seat_S3", 2.20, -9.22, 3.87, 180),
+    # Piano bench (pianist faces the keyboard, -x)
+    ("Seat_Pno", PIANO_SEAT.x, PIANO_SEAT.y, 0.50, -90),
+]
+
+# Floors sit far below any expected seat height, so the z window already
+# excludes them; only the (still unlinked) NavMesh needs a name filter. The
+# ottoman is upholstered in the rug material, so materials must not be used.
+FLOOR_MAT_KEYS = ("NavMat",)
+def snap_seat(name, x, y, z_expect, radius=0.55, step=0.05):
+    """Find the real seat surface near (x, y): a horizontal, non-floor surface
+    within z_expect +/- 0.12. Returns the corrected (x, y, z)."""
+    dgs = bpy.context.evaluated_depsgraph_get()
+    pts = {}
+    yy = y - radius
+    while yy <= y + radius + 1e-6:
+        xx = x - radius
+        while xx <= x + radius + 1e-6:
+            ok, loc, nrm, fi, ob, mw = sc.ray_cast(dgs, Vector((xx, yy, z_expect + 0.9)), Vector((0, 0, -1)), distance=1.2)
+            if ok and abs(loc.z - z_expect) <= 0.12 and nrm.z > 0.7 and ob.name != "NavMesh":
+                mats = ob.data.materials
+                mi = ob.data.polygons[fi].material_index if fi < len(ob.data.polygons) else 0
+                mn = mats[mi].name if mats and mi < len(mats) and mats[mi] else ''
+                if not any(k in mn for k in FLOOR_MAT_KEYS):
+                    pts[(round(xx, 2), round(yy, 2))] = loc.z
+            xx += step
+        yy += step
+    if not pts:
+        print(f"SEAT {name}: NO seat surface near ({x},{y}) z~{z_expect} — kept authored spot")
+        return x, y, z_expect
+    # cluster (8-neighbour) and take the cluster nearest to the authored point
+    seen, clusters = set(), []
+    for k in pts:
+        if k in seen:
+            continue
+        stack, cl = [k], []
+        seen.add(k)
+        while stack:
+            c = stack.pop()
+            cl.append(c)
+            for dx in (-step, 0, step):
+                for dy in (-step, 0, step):
+                    n = (round(c[0] + dx, 2), round(c[1] + dy, 2))
+                    if n in pts and n not in seen:
+                        seen.add(n)
+                        stack.append(n)
+        clusters.append(cl)
+    def near_pt(cl):
+        return min(cl, key=lambda c: (c[0] - x) ** 2 + (c[1] - y) ** 2)
+    cl = min(clusters, key=lambda c: (near_pt(c)[0] - x) ** 2 + (near_pt(c)[1] - y) ** 2)
+    cx, cy = sum(c[0] for c in cl) / len(cl), sum(c[1] for c in cl) / len(cl)
+    nx, ny = near_pt(cl)
+    vx, vy = cx - nx, cy - ny
+    L = math.hypot(vx, vy)
+    stepin = min(0.22, L)
+    if L > 1e-6:
+        nx, ny = nx + vx / L * stepin, ny + vy / L * stepin
+    zc = sum(pts[c] for c in cl) / len(cl)
+    moved = math.hypot(nx - x, ny - y)
+    print(f"SEAT {name}: ({x:.2f},{y:.2f}) -> ({nx:.2f},{ny:.2f}) z={zc:.3f} (cluster {len(cl)} pts, moved {moved:.2f} m)")
+    return nx, ny, zc
+
+SNAPPED = []
+for name, sx, sy, sz, yaw in SEATS:
+    if name.startswith("Seat_HotTub_"):
+        SNAPPED.append((name, sx, sy, sz, yaw))
+        continue
+    nx, ny, nz = snap_seat(name, sx, sy, sz)
+    SNAPPED.append((name, nx, ny, nz, yaw))
+SEATS = SNAPPED
+
 # --- NavMesh: shared-lattice grid over the main floor ------------------------
 # Cell walkable when a down-ray finds floor near z=0 and 1.7 m headroom above.
 RES = 0.25
@@ -1112,7 +1465,7 @@ def nearest_nav_face(point):
     target = Vector(point)
     return min(bm.faces, key=lambda face: (face.calc_center_median() - target).length_squared)
 
-def connect_nav_regions(name, point_a, point_b, threshold, radius=1.0):
+def connect_nav_regions(name, point_a, point_b, threshold, radius=1.0, optional=False):
     components, face_component = nav_face_components()
     ca = face_component[nearest_nav_face(point_a)]
     cb = face_component[nearest_nav_face(point_b)]
@@ -1132,6 +1485,9 @@ def connect_nav_regions(name, point_a, point_b, threshold, radius=1.0):
     edges_a = candidate_edges(ca)
     edges_b = candidate_edges(cb)
     if not edges_a or not edges_b:
+        if optional:
+            print(f"NAV LINK {name}: no boundary edges near {threshold} (optional, skipped)")
+            return
         raise RuntimeError(f"NAV LINK {name} found no boundary edges near {threshold}")
     edge_a, edge_b = min(
         ((ea, eb) for ea in edges_a for eb in edges_b),
@@ -1142,15 +1498,33 @@ def connect_nav_regions(name, point_a, point_b, threshold, radius=1.0):
     if (a0.co - b0.co).length_squared + (a1.co - b1.co).length_squared > (a0.co - b1.co).length_squared + (a1.co - b0.co).length_squared:
         b0, b1 = b1, b0
     gap = (edge_center(edge_a) - edge_center(edge_b)).length
+    # Edges that already touch at one vertex (a corner contact) bridge with a
+    # triangle; a quad would reuse that vertex and fail.
+    ring = []
+    for v in (a0, a1, b1, b0):
+        if v not in ring:
+            ring.append(v)
+    if len(ring) < 3:
+        raise RuntimeError(f"NAV LINK {name}: boundary edges coincide, nothing to bridge")
     try:
-        bm.faces.new((a0, a1, b1, b0))
+        bm.faces.new(tuple(ring))
     except ValueError as exc:
         raise RuntimeError(f"NAV LINK {name} could not bridge boundary edges: {exc}")
-    print(f"NAV LINK {name}: edge gap {gap:.2f} m")
+    print(f"NAV LINK {name}: edge gap {gap:.2f} m ({'tri' if len(ring) == 3 else 'quad'})")
 
 NAV_LINKS = [
     # name, side A probe, side B probe, doorway/landing threshold, search radius
-    ("ground-lobby", (-7.5, 6.0, 0.0), (-4.5, -8.2, 0.05), (-0.64, -8.15, 0.03), 2.5),
+    ("ground-lobby", (-7.5, 6.0, 0.0), (-4.5, -8.2, 0.05), (-1.2, -7.5, 0.02), 1.0),
+    # Library: its door is the 0.7 m opening at the NE corner (x -3.2..-2.5,
+    # y -4.5) and the bookcase end at x -3.1..-2.8 leaves a strip the 0.25 m
+    # grid cannot fit. Bridge the strip.
+    ("ground-library", (-7.5, 6.0, 0.0), (-4.0, -5.3, 0.0), (-3.18, -4.62, 0.02), 0.5),
+    # NW dressing room: 0.6 m door at x -10.1..-9.6 through the y~-1.4 partition
+    # to the vestibule north of the SW bedroom.
+    ("upper-nw-dressing", (-8.0, -3.0, 3.5), (-9.2, -0.3, 3.5), (-9.88, -1.67, 3.52), 0.6),
+    # East bathroom: 1.2 m door in the NE bedroom's south wall (x 7.4..8.6,
+    # y 4.0) with a wardrobe column just inside; bridge past its east side.
+    ("upper-east-bath", (8.0, 5.0, 3.5), (9.9, 2.6, 3.5), (8.45, 3.9, 3.5), 0.45),
     ("ground-stair-pad", (-7.5, 6.0, 0.0), (3.0, -1.0, 0.03), (3.62, -1.55, 0.03), 0.8),
     ("stair-pad-flight", (3.0, -1.0, 0.03), (2.0, -1.5, 0.30), (2.50, -1.55, 0.12), 0.8),
     ("stair-landing", (1.5, -2.05, 3.25), (0.0, -3.5, 3.50), (1.50, -2.05, 3.38), 0.8),
@@ -1159,87 +1533,22 @@ NAV_LINKS = [
     ("upper-sw-bedroom", (0.0, -3.5, 3.50), (-8.0, -3.0, 3.50), (-7.10, -1.68, 3.50), 0.8),
     ("upper-gym", (0.0, -3.5, 3.50), (-1.5, -5.0, 3.54), (-1.62, -6.05, 3.52), 0.8),
     ("upper-east-suite", (0.0, -3.5, 3.50), (8.5, -2.8, 3.50), (7.50, 0.45, 3.50), 0.8),
-    ("upper-sky-den", (0.0, -3.5, 3.50), (1.5, -8.5, 3.53), (-0.75, -8.05, 3.52), 0.8),
+    ("upper-sky-den", (0.0, -3.5, 3.50), (1.5, -8.5, 3.53), (-0.75, -8.05, 3.52), 1.2),
 ]
 for link_args in NAV_LINKS:
     connect_nav_regions(*link_args)
+connect_nav_regions("ground-library-closet", (-1.6, -4.7, 0.0), (-2.0, -5.7, 0.0), (-1.62, -5.15, 0.02), 0.6, optional=True)
 
-# name, x, y, waypoint_z, yaw_deg, floor_z, island
-# yaw: avatar facing after glTF export (empty -Y): 0=-y  90=+x  180=+y  -90=-x
-SEATS = [
-    # Lounge sofa (north arm, facing the room)
-    ("Seat_A1", -9.6, 8.15, 0.75, 0, 0.0, True),
-    ("Seat_A2", -8.6, 8.15, 0.75, 0, 0.0, True),
-    ("Seat_A3", -7.6, 8.15, 0.75, 0, 0.0, True),
-    # Bar stools
-    ("Seat_B1", 9.28, -0.41, 0.95, 0, 0.0, True),
-    ("Seat_B2", 9.88, -0.41, 0.95, 0, 0.0, True),
-    ("Seat_B3", 10.49, -0.41, 0.95, 0, 0.0, True),
-    # Lounge ottoman, facing the TV wall
-    ("Seat_Ott", -9.40, 4.55, 0.65, -90, 0.0, True),
-    # Formal dining — eight lacquer-red qing chairs
-    ("Seat_D1", 7.98, 4.75, 0.75, 90, 0.0, True),
-    ("Seat_D2", 7.98, 5.44, 0.75, 90, 0.0, True),
-    ("Seat_D3", 7.98, 6.46, 0.75, 90, 0.0, True),
-    ("Seat_D4", 7.98, 7.34, 0.75, 90, 0.0, True),
-    ("Seat_D5", 9.62, 4.95, 0.75, -90, 0.0, True),
-    ("Seat_D6", 9.62, 5.70, 0.75, -90, 0.0, True),
-    ("Seat_D7", 9.62, 6.41, 0.75, -90, 0.0, True),
-    ("Seat_D8", 9.62, 7.35, 0.75, -90, 0.0, True),
-    # Terrace dining table
-    ("Seat_T1", 4.66, 5.49, 0.78, -90, 0.0, True),
-    ("Seat_T2", 4.66, 6.19, 0.78, -90, 0.0, True),
-    ("Seat_T3", 4.66, 6.97, 0.78, -90, 0.0, True),
-    ("Seat_T4", 4.66, 7.60, 0.78, -90, 0.0, True),
-    ("Seat_T5", 3.40, 7.07, 0.78, 90, 0.0, True),
-    ("Seat_T6", 3.40, 7.63, 0.78, 90, 0.0, True),
-    ("Seat_T7", 3.40, 5.49, 0.78, 90, 0.0, True),
-    ("Seat_T8", 3.40, 6.19, 0.78, 90, 0.0, True),
-    # Terrace L-sofa (west arm faces the view band, south arm faces north)
-    ("Seat_P1", -3.55, 5.80, 0.92, 90, 0.0, True),
-    ("Seat_P2", -3.55, 6.90, 0.92, 90, 0.0, True),
-    ("Seat_P3", -3.55, 7.95, 0.92, 90, 0.0, True),
-    ("Seat_P4", -2.60, 5.50, 0.92, 180, 0.0, True),
-    ("Seat_P5", -1.30, 5.50, 0.92, 180, 0.0, True),
-    # Library reading group
-    ("Seat_L1", -5.05, -4.85, 0.78, 90, 0.0, True),
-    ("Seat_L2", -4.90, -5.90, 0.78, 90, 0.0, True),
-    ("Seat_L3", -3.90, -6.10, 0.78, 180, 0.0, True),
-    ("Seat_L4", -3.10, -4.95, 0.78, -90, 0.0, True),
-    # Beds: two upright seated spots each. These use a true seated eye height
-    # in the client and always preserve world-up.
-    # Positions come from ray-cast mattress height maps (probe-mattress.py):
-    # NW mattress x[-10.75,-8.75] y[6.25,8.50] headboard west; NE mattress
-    # x[7.50,9.75] y[6.50,8.50] with the wardrobe hard against its south end
-    # (seats south of y~6.5 land inside the closet); SW mattress
-    # x[-9.75,-8.00] y[-4.50,-2.75] headboard south. Seats sit on the
-    # mattress facing away from the headboard.
-    ("Seat_Bed_NW1", -9.70, 6.90, 4.30, 90, 3.52, False),
-    ("Seat_Bed_NW2", -9.70, 7.85, 4.30, 90, 3.52, False),
-    ("Seat_Bed_NE1", 8.15, 7.40, 4.30, 180, 3.52, False),
-    ("Seat_Bed_NE2", 9.15, 7.40, 4.30, 180, 3.52, False),
-    ("Seat_Bed_SW1", -9.30, -3.60, 4.30, 180, 3.52, False),
-    ("Seat_Bed_SW2", -8.45, -3.60, 4.30, 180, 3.52, False),
-    # SW terrace hot tub, four submerged seats facing the centre. The client
-    # uses a 0.70 m seated eye height for these instead of its standing 1.60 m.
-    ("Seat_HotTub_N1", -10.28, -6.15, 0.25, 0, 0.05, False),
-    ("Seat_HotTub_N2", -9.22, -6.15, 0.25, 0, 0.05, False),
-    ("Seat_HotTub_S1", -10.28, -8.15, 0.25, 180, 0.05, False),
-    ("Seat_HotTub_S2", -9.22, -8.15, 0.25, 180, 0.05, False),
-    # SE terrace bistro pair
-    ("Seat_E1", 9.50, -6.55, 0.75, 0, 0.05, True),
-    ("Seat_E2", 9.50, -8.05, 0.75, 180, 0.05, True),
-    # Sky den sofa
-    ("Seat_S1", 0.60, -9.22, 4.31, 180, 3.53, True),
-    ("Seat_S2", 1.40, -9.22, 4.31, 180, 3.53, True),
-    ("Seat_S3", 2.20, -9.22, 4.31, 180, 3.53, True),
-]
-for _, sx, sy, _, _, fz, isl in SEATS:  # floor-level landing islands inside seat footprints
-    if not isl:
-        continue
-    h = 0.24
-    vs = [bm.verts.new(p) for p in ((sx-h, sy-h, fz+0.002), (sx+h, sy-h, fz+0.002), (sx+h, sy+h, fz+0.002), (sx-h, sy+h, fz+0.002))]
-    bm.faces.new(vs)
+# Everything that is not face-connected to the ground lounge is unreachable on
+# foot (closets behind doors, showers behind glass, slivers between furniture
+# and glass). The teleport arc must not be able to land there either.
+_components, _face_component = nav_face_components()
+_root = _face_component[nearest_nav_face((-7.5, 6.0, 0.0))]
+_dropped = [f for f in bm.faces if _face_component[f] != _root]
+if _dropped:
+    _n_islands = len({_face_component[f] for f in _dropped})
+    bmesh.ops.delete(bm, geom=_dropped, context='FACES')
+    print(f"NAV prune: dropped {len(_dropped)} faces in {_n_islands} unreachable islands")
 
 # Build gate: all occupied rooms must resolve to the same face-connected
 # navigation component as the ground lounge. This catches missing thresholds
@@ -1275,6 +1584,14 @@ NAV_REQUIRED = {
     "upper gym": (-1.5, -5.0, 3.54),
     "upper east suite": (8.5, -2.8, 3.50),
     "upper sky den": (1.5, -8.5, 3.53),
+    "ground library": (-4.0, -5.3, 0.0),
+    "ground patio": (0.0, 7.6, 0.0),
+    "ground dining": (6.5, 6.0, 0.0),
+    "ground vestibule": (0.2, -7.6, 0.0),
+    "sw terrace deck": (-7.95, -6.3, 0.07),
+    "se terrace deck": (8.5, -6.0, 0.07),
+    "upper NW dressing": (-9.2, -0.3, 3.5),
+    "upper east bath": (9.9, 2.6, 3.5),
 }
 required_components = {}
 for label, point in NAV_REQUIRED.items():
@@ -1305,7 +1622,7 @@ def empty(name, x, y, z, yaw=0.0):
 
 empty("Spawn_1", -4.0, 0.0, 0, math.pi / 2)   # hall west, facing +x
 empty("Spawn_2", 4.5, 1.5, 0, -math.pi / 2)   # hall east, facing -x
-for name, sx, sy, sz, yawdeg, _, _ in SEATS:
+for name, sx, sy, sz, yawdeg in SEATS:
     empty(name, sx, sy, sz, math.radians(yawdeg))
 empty("AmbientLight", 0, 0, 2.8)
 empty("Light_A", -7.5, 5.0, 2.4)   # over the lounge sofa
@@ -1340,7 +1657,7 @@ dark = bpy.data.materials.new('ScreenDark')
 dark.use_nodes = True
 bsdf = dark.node_tree.nodes['Principled BSDF']
 bsdf.inputs['Base Color'].default_value = (0.02, 0.027, 0.04, 1)
-bsdf.inputs['Roughness'].default_value = 0.3
+bsdf.inputs['Roughness'].default_value = 0.55  # 0.3 threw a hard point-light hot spot across the whole panel
 # West-wall black panel, facing east into the lounge (rotate -y normal to +x).
 # The wall face position drifts as the source mesh is edited, and an authored
 # constant once left the whole TV buried 24 cm behind the wall — so probe the
@@ -1360,60 +1677,99 @@ mon = plane("MonitorScreen", 1.06, 0.6, 9.9, -0.78, 1.25, 0, dark)
 mon.rotation_euler = (0, 0, math.pi)  # flip to face +y (toward the bar stools)
 
 # --- Gallery: public-domain masters on the perimeter walls -------------------
-# (name, image, x, y, center z, height, facing) — facing: +x|-x|+y|-y
+# (name, image, facing, wall coord, preferred centre, search min, search max, z, height)
+# facing = the direction the canvas faces (into the room). "wall coord" is the
+# x of a ±x wall or the y of a ±y wall; the canvas centre slides along the
+# wall from the preferred spot outward until a slot is found where EVERY
+# sample across the canvas hits the same flat, vertical, non-glass surface
+# and nothing stands within 0.6 m in front of it.
 import os
 ART_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "art")
 YAWS = {"+x": math.pi / 2, "-x": -math.pi / 2, "+y": math.pi, "-y": 0.0}
+DIRV = {"+x": Vector((-1, 0, 0)), "-x": Vector((1, 0, 0)), "+y": Vector((0, -1, 0)), "-y": Vector((0, 1, 0))}
 GALLERY = [
-    # Group of Seven — lounge, west wall
-    ("Art_JackPine", "jackpine.jpg", -11.18, 9.3, 1.7, 1.3, "+x"),
-    # West Wind: lobby east wall, facing the elevators
-    ("Art_WestWind", "westwind.jpg", -0.64, -8.2, 1.55, 1.1, "-x"),
-    # Sunrise + Tangled Garden: solid north wall of the arrival lobby. Their
-    # former hall positions were patio glass, not a wall.
-    ("Art_Sunrise", "sunrise.jpg", -4.70, -6.54, 2.08, 0.85, "-y"),
-    ("Art_Starry", "starrynight.jpg", -11.18, -4.2, 1.6, 1.2, "+x"),
-    # Lobby north wall + the covered walk's facade wall outside
-    ("Art_Moulin", "moulin.jpg", -1.9, -6.66, 1.6, 1.15, "-y"),
-    ("Art_Wave", "wave.jpg", 5.3, -6.30, 1.55, 1.1, "-y"),
-    # Dining + bar, east wall
-    ("Art_Kiss", "kiss.jpg", 11.18, 7.0, 1.7, 1.5, "-x"),
-    ("Art_Sunflowers", "sunflowers.jpg", 11.18, 4.3, 1.6, 1.3, "-x"),
-    ("Art_Cafe", "cafeterrace.jpg", 11.18, -2.6, 1.5, 1.3, "-x"),
-    ("Art_Tangled", "tangledgarden.jpg", -4.70, -6.54, 0.92, 0.85, "-y"),
+    # Group of Seven: Jack Pine over the lounge fireplace (chimney breast).
+    ("Art_JackPine", "jackpine.jpg", [("+x", -10.44, 4.2, 3.5, 4.95, 2.15)], 1.0),
+    # Starry Night on the piano corner's west wall (first clean run).
+    ("Art_Starry", "starrynight.jpg", [("+x", -10.96, -3.0, -5.6, 0.6, 1.6)], 1.2),
+    # Lobby north wall, both at eye level, either side of the runner.
+    ("Art_Sunrise", "sunrise.jpg", [("-y", -6.57, -4.6, -5.25, -3.7, 1.6)], 0.95),
+    ("Art_Moulin", "moulin.jpg", [("-y", -6.57, -2.55, -3.6, -1.42, 1.6)], 1.15),
+    # West Wind on the lobby's west wall north of the terrace door, facing in.
+    ("Art_WestWind", "westwind.jpg", [("+x", -7.62, -7.43, -8.25, -6.65, 1.55)], 1.1),
+    # Covered walk facade wall outside.
+    ("Art_Wave", "wave.jpg", [("-y", -6.30, 5.3, 3.8, 6.9, 1.55)], 1.1),
+    # Dining + bar, east wall.
+    ("Art_Kiss", "kiss.jpg", [("-x", 11.18, 7.0, 6.0, 8.6, 1.7)], 1.5),
+    ("Art_Sunflowers", "sunflowers.jpg", [("-x", 11.18, 4.3, 2.8, 5.7, 1.6)], 1.3),
+    # Cafe Terrace: the bar's east wall is cabinets and blinds end to end, so
+    # fall back to the vestibule's south wall, then the bar wall north of the
+    # island, then the dining wall between the Kiss and the north glass.
+    ("Art_Cafe", "cafeterrace.jpg", [("-x", 11.18, -2.6, -4.3, -1.1, 1.5),
+                                     ("+y", -9.55, 1.2, -0.2, 2.8, 1.55),
+                                     ("-x", 11.18, 1.5, -0.2, 3.0, 1.5),
+                                     ("-x", 11.18, 8.6, 7.9, 9.4, 1.6)], 1.3),
+    # Tangled Garden in the sky den (north wall).
+    ("Art_Tangled", "tangledgarden.jpg", [("-y", -7.10, 2.6, 0.3, 3.7, 5.05)], 0.85),
 ]
 framemat = mat_frame = bpy.data.materials.new('ArtFrame')
 mat_frame.use_nodes = True
 fb = mat_frame.node_tree.nodes['Principled BSDF']
 fb.inputs['Base Color'].default_value = (0.02, 0.018, 0.015, 1)
 fb.inputs['Roughness'].default_value = 0.4
-# Probe each wall spot from 3 m inside the room and hang the piece 4 cm in
-# front of whatever surface is actually there (walls, panels, wardrobes).
-DIRV = {"+x": Vector((-1, 0, 0)), "-x": Vector((1, 0, 0)), "+y": Vector((0, -1, 0)), "-y": Vector((0, 1, 0))}
 dga = bpy.context.evaluated_depsgraph_get()
-probed = []
-for name, fn, ax, ay, az, h, facing in GALLERY:
+
+def art_slot(name, facing, wall_c, u_pref, u_min, u_max, z, w, h):
     d = DIRV[facing]
-    origin = Vector((ax, ay, az)) - d * 3.0
-    ok, loc, nrm, fi, ob, mw = sc.ray_cast(dga, origin, d, distance=4.5)
-    support_mat = None
-    if ok and ob.type == 'MESH' and fi < len(ob.data.polygons):
-        poly = ob.data.polygons[fi]
-        if poly.material_index < len(ob.data.materials):
-            support_mat = ob.data.materials[poly.material_index]
-    if support_mat and support_mat.name == 'fake_mat_255_255_255_32':
-        raise RuntimeError(f"GALLERY SUPPORT GATE failed: {name} resolves to glass on {ob.name}")
-    # Accept the probed surface only if it is an actual vertical wall close to
-    # the intended spot — otherwise art ends up floating on curtains/furniture.
-    if ok and abs(nrm.z) < 0.4 and (loc - Vector((ax, ay, az))).length < 0.9:
-        pos = loc - d * 0.025
-        ax, ay = pos.x, pos.y
-    probed.append((name, fn, ax, ay, az, h, facing))
-GALLERY = probed
-for name, fn, ax, ay, az, h, facing in GALLERY:
+    horiz = facing in ("+x", "-x")
+    def probe(u):
+        depths = []
+        for i in range(7):
+            for j in range(5):
+                uu = u + (i - 3) / 3.0 * (w / 2) * 0.97
+                zz = z + (j - 2) / 2.0 * (h / 2) * 0.97
+                origin = (Vector((wall_c, uu, zz)) if horiz else Vector((uu, wall_c, zz))) - d * 0.6
+                ok, loc, nrm, fi, ob, mw = sc.ray_cast(dga, origin, d, distance=1.2)
+                if not ok or ob.name.startswith(("Art_", "NavMesh", "View", "Spawn", "Seat_")):
+                    return None
+                mats = ob.data.materials
+                mi = ob.data.polygons[fi].material_index if fi < len(ob.data.polygons) else 0
+                mn = mats[mi].name if mats and mi < len(mats) and mats[mi] else ''
+                if mn == GLASS_MAT or abs(nrm.z) > 0.3 or nrm.dot(-d) < 0.7:
+                    return None
+                depths.append((loc - origin).length)
+        if max(depths) - min(depths) > 0.015:
+            return None
+        return sum(depths) / len(depths)
+    order = [u_pref]
+    for k in range(1, 80):
+        for u in (u_pref + 0.1 * k, u_pref - 0.1 * k):
+            if u_min + w / 2 - 1e-6 <= u <= u_max - w / 2 + 1e-6:
+                order.append(u)
+    for u in order:
+        depth = probe(u)
+        if depth is not None:
+            origin = (Vector((wall_c, u, z)) if horiz else Vector((u, wall_c, z))) - d * 0.6
+            surf = origin + d * depth
+            pos = surf - d * 0.025
+            print(f"GALLERY {name}: slot at u={u:.2f} (preferred {u_pref:.2f}, moved {abs(u - u_pref):.2f} m), surface {tuple(round(v, 3) for v in surf)}")
+            return pos
+    print(f"GALLERY {name}: NO clean {w:.2f}x{h:.2f} slot on {facing} wall {wall_c} in [{u_min},{u_max}] — SKIPPED")
+    return None
+
+hung = 0
+for name, fn, cands, h in GALLERY:
     img = bpy.data.images.load(os.path.join(ART_DIR, fn))
     aspect = img.size[0] / img.size[1]
     w = h * aspect
+    pos = None
+    for facing, wall_c, u_pref, u_min, u_max, az in cands:
+        pos = art_slot(name, facing, wall_c, u_pref, u_min, u_max, az, w, h)
+        if pos is not None:
+            break
+    if pos is None:
+        continue
+    ax, ay = pos.x, pos.y
     am = bpy.data.materials.new(name + "_mat")
     am.use_nodes = True
     nt2 = am.node_tree
@@ -1441,13 +1797,12 @@ for name, fn, ax, ay, az, h, facing in GALLERY:
     else:
         fr.scale = (fw / 2, 0.025, fh / 2)
     fr.data.materials.append(mat_frame)
+    hung += 1
+if hung < 8:
+    raise RuntimeError(f"GALLERY: only {hung} of {len(GALLERY)} pieces found a clean wall slot")
 
-# Four directional backdrop planes, one emissive material each. The baked
-# textures are 2048-wide placeholders from lounge-assets/bake/ — the runtime
-# view switcher swaps every wall's emissiveMap to the matching full-res
-# day/dusk view, so all windows stay in the same scene but each compass
-# direction shows what it should: Central Park north, East River east,
-# Hudson west, Midtown south.
+# Emissive backdrop material: the runtime view switcher swaps its emissiveMap
+# for the full-res day/dusk image.
 def viewmat(mname, img_path):
     vm = bpy.data.materials.new(mname)
     vm.use_nodes = True
@@ -1463,14 +1818,51 @@ def viewmat(mname, img_path):
     return vm
 
 BAKE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bake")
-plane("RockiesView", 26, 13, 0, 10.9, 4.0, 0, viewmat('RockiesBackdrop', viewimg))
-for wname, wx, wy, wyaw, mname, img in (
-        ("ViewEast", 13.0, 0.0, -math.pi / 2, 'EastBackdrop', 'day-east.jpg'),
-        ("ViewWest", -13.0, 0.0, math.pi / 2, 'WestBackdrop', 'day-west.jpg'),
-        ("ViewSouth", 0.0, -12.5, math.pi, 'SouthBackdrop', 'day-south.jpg')):
-    wp = plane(wname, 30, 13, wx, wy, 4.0, 0,
-               viewmat(mname, os.path.join(BAKE_DIR, img)))
-    wp.rotation_euler = (0, 0, wyaw)
+
+# Skyline: one cylindrical panorama (make-pano.py stitches the four
+# directional photos with feathered seams, horizon at z 3.5) instead of four
+# flat planes meeting at 90-degree corners. Radius 17 m clears the building's
+# corners (15.4 m); z -4..13 keeps the old planes' vertical coverage. UV u=0
+# at the NW corner, increasing clockwise (north, east, south, west quadrants),
+# so the panorama reads un-mirrored from inside. The bake texture is a 1024
+# placeholder; the runtime view switcher swaps in the 8K day/dusk panorama.
+def view_cylinder(name, mat, radius=17.0, z0=-4.0, z1=13.0, segs=72):
+    me = bpy.data.meshes.new(name)
+    bmv = bmesh.new()
+    uvl = bmv.loops.layers.uv.new("UVMap")
+    ring0, ring1 = [], []
+    for i in range(segs):
+        az = math.radians(-45.0 + 360.0 * i / segs)
+        x, y = radius * math.sin(az), radius * math.cos(az)
+        ring0.append(bmv.verts.new((x, y, z0)))
+        ring1.append(bmv.verts.new((x, y, z1)))
+    for i in range(segs):
+        j = (i + 1) % segs
+        f = bmv.faces.new((ring0[i], ring0[j], ring1[j], ring1[i]))
+        u0, u1 = i / segs, (i + 1) / segs
+        for loop, uv in zip(f.loops, ((u0, 0.0), (u1, 0.0), (u1, 1.0), (u0, 1.0))):
+            loop[uvl].uv = uv
+    bmv.to_mesh(me)
+    bmv.free()
+    me.materials.append(mat)
+    o = bpy.data.objects.new(name, me)
+    sc.collection.objects.link(o)
+    return o
+
+view_cylinder("ViewPano", viewmat('PanoBackdrop', viewimg))
+
+# Sky dome: an emissive gradient sphere so the patio, terraces and sky den see
+# sky above the backdrop planes instead of the renderer's black clear colour.
+# The runtime view switcher swaps its emissiveMap with the day/dusk sky.
+bpy.ops.mesh.primitive_uv_sphere_add(segments=32, ring_count=16, radius=70, location=(0, 0, 0))
+sky = bpy.context.active_object
+sky.name = "ViewSky"
+sky.data.materials.append(viewmat('SkyBackdrop', os.path.join(BAKE_DIR, 'day-sky.jpg')))
+_bs = bmesh.new()
+_bs.from_mesh(sky.data)
+bmesh.ops.reverse_faces(_bs, faces=_bs.faces[:])
+_bs.to_mesh(sky.data)
+_bs.free()
 
 # --- Export ------------------------------------------------------------------
 # Quest has a limited shared graphics-memory budget. Cap source, artwork and

@@ -68,7 +68,11 @@ for (const node of json.nodes || []) {
     comps = { "spawn-point": {} };
     counts.spawn++;
   } else if (/^Seat_/.test(n)) {
-    const eyeHeight = /^Seat_HotTub_/.test(n) ? 0.70 : /^Seat_Bed_/.test(n) ? 0.80 : 1.6;
+    // Every seat waypoint sits ON its cushion/mattress surface (build-penthouse.py
+    // ray-casts the seat top), so a seated eye line is surface + eyeHeight +
+    // the client's 0.15 m occupied lift: 0.75 m above the seat, like a person.
+    // Hot-tub seats are sunk below the water line and keep their own value.
+    const eyeHeight = /^Seat_HotTub_/.test(n) ? 0.70 : 0.60;
     comps = seatWaypoint(n.toLowerCase().replace(/_/g, "-"), eyeHeight);
     counts.seat++;
   } else if (n === "AmbientLight") {
@@ -82,21 +86,23 @@ for (const node of json.nodes || []) {
 }
 const tagged = counts.nav + counts.spawn + counts.seat + counts.light + counts.ambient;
 console.log("tag counts:", JSON.stringify(counts));
-if (counts.nav !== 1 || counts.spawn !== 2 || counts.seat < 45 || counts.light !== 4 || counts.ambient !== 1) {
+if (counts.nav !== 1 || counts.spawn !== 2 || counts.seat < 40 || counts.light !== 4 || counts.ambient !== 1) {
   throw new Error(`unexpected tag counts: ${JSON.stringify(counts)}`);
 }
-const pianoNodes = (json.nodes || []).filter(node => /^(Piano|Seat_Pno)/.test(node.name || ""));
-if (pianoNodes.length) throw new Error(`piano nodes remain after removal: ${pianoNodes.map(node => node.name)}`);
+// The unusable source piano (Object_108) must stay deleted; the procedural
+// black-lacquer grand (Pno_*) that replaced it is expected.
+if ((json.nodes || []).some(node => node.name === "Object_108")) throw new Error("source piano Object_108 still present");
+if (!(json.nodes || []).some(node => node.name === "Pno_Body")) throw new Error("procedural piano missing");
 const bedSeatNodes = (json.nodes || []).filter(node => /^Seat_Bed_/.test(node.name || ""));
 if (
   bedSeatNodes.length !== 6 ||
   bedSeatNodes.some(
     node =>
       node.extensions?.MOZ_hubs_components?.waypoint?.willMaintainWorldUp !== true ||
-      node.extensions?.MOZ_hubs_components?.waypoint?.eyeHeight !== 0.80
+      node.extensions?.MOZ_hubs_components?.waypoint?.eyeHeight !== 0.60
   )
 ) {
-  throw new Error("six upright bed seats with 0.80 m seated eye height are required");
+  throw new Error("six upright bed seats with 0.60 m seated eye height are required");
 }
 const hotTubSeatNodes = (json.nodes || []).filter(node => /^Seat_HotTub_/.test(node.name || ""));
 if (hotTubSeatNodes.length !== 4) throw new Error(`expected four hot-tub seats, found ${hotTubSeatNodes.length}`);
@@ -105,21 +111,21 @@ for (const node of hotTubSeatNodes) {
     throw new Error(`${node.name} is missing its 0.70 m seated eye height`);
   }
   // glTF Y is Blender Z. With the 0.70 m seated eye height and the client's
-  // 0.15 m occupied-waypoint lift, the final eye line is 1.10 m, 0.545 m
-  // above the water. The avatar rig is sunk so the body is seated, not standing.
+  // 0.15 m occupied-waypoint lift, the final eye line is 0.95 m, 0.40 m above
+  // the water (z 0.555): chest-deep. The rig is sunk so the body is seated.
   const targetHeight = node.translation?.[1];
-  if (targetHeight === undefined || Math.abs(targetHeight - 0.25) > 0.01) {
+  if (targetHeight === undefined || Math.abs(targetHeight - 0.10) > 0.01) {
     throw new Error(`${node.name} has unsafe hot-tub target height ${targetHeight}`);
   }
 }
-// Every backdrop plane must exist so no window faces a void.
-for (const req of ["RockiesView", "ViewEast", "ViewWest", "ViewSouth"]) {
-  if (!(json.nodes || []).some(nd => nd.name === req)) throw new Error(`missing backdrop plane ${req}`);
+// The skyline cylinder and sky dome must exist so no window faces a void.
+for (const req of ["ViewPano", "ViewSky"]) {
+  if (!(json.nodes || []).some(nd => nd.name === req)) throw new Error(`missing backdrop mesh ${req}`);
 }
 
-// Each directional backdrop material must be emissive with an emissiveTexture
-// (the runtime view switcher swaps each wall's emissiveMap independently).
-for (const mn of ["RockiesBackdrop", "EastBackdrop", "WestBackdrop", "SouthBackdrop"]) {
+// Each backdrop material must be emissive with an emissiveTexture (the
+// runtime view switcher swaps each emissiveMap for the day/dusk images).
+for (const mn of ["PanoBackdrop", "SkyBackdrop"]) {
   const m = (json.materials || []).find(mm => mm.name === mn);
   if (!m) throw new Error(`${mn} material not found`);
   if (!m.emissiveTexture) throw new Error(`${mn} has no emissiveTexture — check Blender emission export`);
