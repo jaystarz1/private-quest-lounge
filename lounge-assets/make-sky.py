@@ -22,13 +22,20 @@ def adjust(rgb, sat=1.0, val=1.0):
     h, s, v = colorsys.rgb_to_hsv(*[c / 255 for c in rgb])
     return tuple(int(round(c * 255)) for c in colorsys.hsv_to_rgb(h, min(1, s * sat), min(1, v * val)))
 
-for scene in ("day", "dusk"):
+scenes = sorted({f.split("-")[0] for f in os.listdir(src_dir) if "-" in f and f.lower().endswith((".jpg", ".jpeg", ".png"))})
+for scene in scenes:
     cols = [top_color(os.path.join(src_dir, f)) for f in sorted(os.listdir(src_dir)) if f.startswith(scene + "-")]
     if not cols:
         continue
     horizon = tuple(int(sum(c[i] for c in cols) / len(cols)) for i in range(3))
-    zenith = adjust(horizon, sat=1.9 if scene == "day" else 1.5, val=0.72 if scene == "day" else 0.55)
-    below = adjust(horizon, sat=0.6, val=0.62)
+    if scene == "night":
+        # Light-polluted city night: near-black zenith, faint violet glow at the skyline.
+        horizon = (24, 22, 40)
+        zenith = (6, 8, 18)
+        below = (16, 15, 24)
+    else:
+        zenith = adjust(horizon, sat=1.9 if scene == "day" else 1.5, val=0.72 if scene == "day" else 0.55)
+        below = adjust(horizon, sat=0.6, val=0.62)
     W, H = 512, 256
     im = Image.new("RGB", (W, H))
     px = im.load()

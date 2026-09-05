@@ -1,0 +1,131 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#777}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./three/build/three.module.js"}}</script></head><body>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from './three/examples/jsm/loaders/GLTFLoader.js';
+window.THREE = THREE;
+window.AFRAME = { registerComponent(name, def) { window.__armIkDef = def; } };
+const q = new URLSearchParams(location.search);
+const armSrc = q.get('ik') || 'arm-ik-current.js';
+await new Promise((res, rej) => { const s = document.createElement('script'); s.src = './' + armSrc; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+const W = 420, H = 560;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W * 3, H); document.body.appendChild(renderer.domElement);
+renderer.setScissorTest(true);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x777777);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.1));
+const dl = new THREE.DirectionalLight(0xffffff, 1.4); dl.position.set(1, 2, 2); scene.add(dl);
+const dl2 = new THREE.DirectionalLight(0xffffff, 0.6); dl2.position.set(-2, 1, -1); scene.add(dl2);
+const gltf = await new GLTFLoader().loadAsync('./' + (q.get('avatar') || 'avatar-jay-real.glb'));
+const root = gltf.scene.getObjectByName('AvatarRoot') || gltf.scene;
+scene.add(gltf.scene);
+const grey = new THREE.MeshLambertMaterial({ color: 0xd8d0c4 });
+const meshes = [];
+gltf.scene.traverse(o => { if (o.isSkinnedMesh) { o.material = grey; o.frustumCulled = false; meshes.push(o); } else if (o.isMesh) { o.visible = false; } });
+const bone = n => root.getObjectByName(n);
+const spine = bone('Spine');
+const names = ['LeftShoulder','LeftArm','LeftForeArm','LeftForeArm1','LeftForeArm2','LeftHand','RightShoulder','RightArm','RightForeArm','RightForeArm1','RightForeArm2','RightHand','Neck','Head'];
+root.updateWorldMatrix(true, true);
+const bindWorld = {}; for (const n of names) bindWorld[n] = bone(n).getWorldPosition(new THREE.Vector3());
+// skin sampling for stretch metrics: body mesh triangles touching shoulder/arm bones
+const body = meshes.find(m => m.name === 'AvatarBody') || meshes[0];
+const outfit = meshes.find(m => m.name === 'outfit');
+function armTris(mesh, side) {
+  const g = mesh.geometry, idx = g.index.array, si = g.attributes.skinIndex.array, sw = g.attributes.skinWeight.array;
+  const bones = mesh.skeleton.bones.map(b => b.name);
+  const want = new Set([side + 'Shoulder', side + 'Arm', side + 'ForeArm', side + 'ForeArm1', side + 'ForeArm2'].map(n => bones.indexOf(n)));
+  const good = v => { for (let k = 0; k < 4; k++) if (want.has(si[v * 4 + k]) && sw[v * 4 + k] > 0.25) return true; return false; };
+  const tris = [];
+  for (let i = 0; i < idx.length; i += 3) { if (good(idx[i]) || good(idx[i + 1]) || good(idx[i + 2])) tris.push([idx[i], idx[i + 1], idx[i + 2]]); }
+  return tris;
+}
+const stretchSets = {};
+for (const side of ['Left', 'Right']) stretchSets[side] = [[body, armTris(body, side)], ...(outfit ? [[outfit, armTris(outfit, side)]] : [])];
+const bindPos = new Map();
+function skinnedPos(mesh, v, out) { return mesh.applyBoneTransform ? mesh.applyBoneTransform(v, out.fromBufferAttribute(mesh.geometry.attributes.position, v)) : mesh.boneTransform(v, out.fromBufferAttribute(mesh.geometry.attributes.position, v)); }
+function edgeStats(side) {
+  const a = new THREE.Vector3(), b = new THREE.Vector3(); let worst = 1, sum = 0, n = 0;
+  for (const [mesh, tris] of stretchSets[side]) {
+    mesh.skeleton.update();
+    for (const t of tris) for (let e = 0; e < 3; e++) {
+      const v0 = t[e], v1 = t[(e + 1) % 3];
+      const key = mesh.name + ':' + v0 + ':' + v1;
+      let bl = bindPos.get(key);
+      if (bl === undefined) { const p0 = new THREE.Vector3().fromBufferAttribute(mesh.geometry.attributes.position, v0), p1 = new THREE.Vector3().fromBufferAttribute(mesh.geometry.attributes.position, v1); bl = p0.distanceTo(p1); bindPos.set(key, bl); }
+      if (bl < 1e-4) continue;
+      skinnedPos(mesh, v0, a); skinnedPos(mesh, v1, b);
+      const r = a.distanceTo(b) / bl; worst = Math.max(worst, r); sum += r; n++;
+    }
+  }
+  return { worstStretch: +worst.toFixed(2), meanStretch: +(sum / Math.max(1, n)).toFixed(3) };
+}
+const tracked = { leftController: { object3D: { visible: true, position: { x: 0.2, y: 0.3, z: 0.1 } } }, rightController: { object3D: { visible: true, position: { x: -0.2, y: 0.3, z: 0.1 } } } };
+const comp = Object.assign(Object.create(window.__armIkDef), { el: { object3D: root, components: { "ik-controller": { ikRoot: tracked } }, sceneEl: { } } });
+window.__setTracked = (l, r) => { tracked.leftController.object3D.visible = l; tracked.rightController.object3D.visible = r; };
+window.__solveN = n => { for (let i = 0; i < n; i++) comp.tock(i * 16, 16); root.updateWorldMatrix(true, true); draw(); return window.__metrics(); };
+comp.init();
+const cams = { front: [0, 0.45, 2.6, 0], side: [2.6, 0.45, 0, 0], top: [0, 3.0, 0.001, 1] };
+const cam = new THREE.OrthographicCamera(-0.75, 0.75, 1.0, -1.0, 0.1, 10);
+function draw() {
+  let i = 0;
+  for (const [nm, [x, y, z, top]] of Object.entries(cams)) {
+    cam.position.set(x, y, z); cam.up.set(0, top ? 0 : 1, top ? -1 : 0); cam.lookAt(0, top ? 0 : 0.45, 0);
+    renderer.setViewport(i * W, 0, W, H); renderer.setScissor(i * W, 0, W, H); renderer.render(scene, cam); i++;
+  }
+}
+// Emulates ik-controller.updateHand: the hand bone (child of Spine) is set from a
+// world-space hand transform (position + basis: fingers direction, palm normal).
+const tmpM = new THREE.Matrix4(), inv = new THREE.Matrix4();
+function setHand(side, pos, fingers, palm) {
+  const hand = bone(side + 'Hand');
+  const y = new THREE.Vector3(...fingers).normalize();
+  const z = new THREE.Vector3(...palm).normalize(); z.addScaledVector(y, -y.dot(z)).normalize();
+  const x = new THREE.Vector3().crossVectors(y, z).normalize();
+  tmpM.makeBasis(x, y, z).setPosition(new THREE.Vector3(...pos));
+  spine.updateWorldMatrix(true, false);
+  inv.copy(spine.matrixWorld).invert();
+  tmpM.premultiply(inv);
+  hand.position.setFromMatrixPosition(tmpM); hand.quaternion.setFromRotationMatrix(tmpM);
+  hand.updateMatrixWorld(true);
+}
+window.__setHands = (L, R) => { setHand('Left', ...L); setHand('Right', ...R); };
+window.__solve = () => { comp.tock(); root.updateWorldMatrix(true, true); draw(); return window.__metrics(); };
+window.__metrics = () => {
+  const out = {};
+  for (const side of ['Left', 'Right']) {
+    const P = n => bone(side + n).getWorldPosition(new THREE.Vector3());
+    const sh = P('Shoulder'), ar = P('Arm'), el = P('ForeArm'), f1 = P('ForeArm1'), f2 = P('ForeArm2'), hd = P('Hand');
+    const upper = ar.distanceTo(el), bindUpper = bindWorld[side + 'Arm'].distanceTo(bindWorld[side + 'ForeArm']);
+    const clav = sh.distanceTo(ar), bindClav = bindWorld[side + 'Shoulder'].distanceTo(bindWorld[side + 'Arm']);
+    const lowerDir = new THREE.Vector3().subVectors(f2, el).normalize();
+    const bindLower = bindWorld[side + 'ForeArm'].distanceTo(bindWorld[side + 'Hand']);
+    const tail = el.clone().addScaledVector(lowerDir, bindLower);
+    const wristGap = tail.distanceTo(hd);
+    const bindElbowFromShoulder = bindWorld[side + 'ForeArm'].clone().sub(bindWorld[side + 'Arm']);
+    out[side] = {
+      shoulder: sh.toArray().map(v => +v.toFixed(3)), armHead: ar.toArray().map(v => +v.toFixed(3)), elbow: el.toArray().map(v => +v.toFixed(3)), hand: hd.toArray().map(v => +v.toFixed(3)),
+      upperLen: +upper.toFixed(3), upperBind: +bindUpper.toFixed(3), clavLen: +clav.toFixed(3), clavBind: +bindClav.toFixed(3),
+      armHeadShift: +ar.distanceTo(bindWorld[side + 'Arm']).toFixed(3),
+      wristGap: +wristGap.toFixed(3), reach: +sh.distanceTo(hd).toFixed(3),
+      elbowAngleDeg: +THREE.MathUtils.radToDeg(new THREE.Vector3().subVectors(ar, el).angleTo(new THREE.Vector3().subVectors(hd, el))).toFixed(1),
+      ...edgeStats(side)
+    };
+  }
+  return out;
+};
+// signed roll of each forearm segment's local +x about the forearm axis, relative to the elbow segment's rest
+window.__twist = () => {
+  const out = {};
+  for (const side of ['Left', 'Right']) {
+    const el = bone(side + 'ForeArm'), hd = bone(side + 'Hand');
+    const axis = new THREE.Vector3().subVectors(hd.getWorldPosition(new THREE.Vector3()), el.getWorldPosition(new THREE.Vector3())).normalize();
+    const xOf = b => { const v = new THREE.Vector3(1, 0, 0).applyQuaternion(b.getWorldQuaternion(new THREE.Quaternion())); return v.addScaledVector(axis, -v.dot(axis)).normalize(); };
+    const ref = new THREE.Vector3(0, 1, 0).addScaledVector(axis, -axis.y).normalize();
+    const ang = b => { const v = xOf(b); return +THREE.MathUtils.radToDeg(Math.atan2(new THREE.Vector3().crossVectors(ref, v).dot(axis), ref.dot(v))).toFixed(0); };
+    out[side] = { f0: ang(el), f1: ang(bone(side + 'ForeArm1')), f2: ang(bone(side + 'ForeArm2')), hand: ang(hd) };
+  }
+  return out;
+};
+root.updateWorldMatrix(true, true); draw();
+window.__ready = true;
+</script></body></html>

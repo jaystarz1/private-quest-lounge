@@ -2,18 +2,20 @@ meta:
   last_updated: '2026-09-04'
   purpose: Operational continuity for the private Quest lounge
 current_state:
-  active_task: 'Full interior audit + fix pass: verified art slots, lobby rework, seat surface snapping, connected nav, piano, plants, cylindrical panorama, sky dome, chest-deep hot tub'
+  active_task: 'Second review pass: fireplace art centring, gym and closet finishes, spa terrace, night view scene, MetaPerson arm solver rewrite'
   status: complete
-  next_action: 'Headset-verify on two Quests: sit on a sofa/stool/bed/tub and confirm eye line and the other avatar seated on the cushion; walk lobby -> front door -> vestibule, hall -> library, SW bedroom -> dressing room, NE bedroom -> bath; look at terrace corners (panorama seam softness) and sky; seat icons should appear only within 3.5 m on your own floor.'
-  summary: Blender render sweep of 32 interior stations + two-client Playwright simulation found seated eyes at 2.5 m (avatars floating over sofas), 8 seats with no chair, 60 nav islands, art crossing wall edges/curtains/a glass door, the lobby's fake east wall hiding the real front door, black metals, cube hedges, no sky. All fixed in build-penthouse.py (verified flat-wall art slots, seat surface snapping, nav links + island prune, procedural grand piano, instanced plants/Qing chairs, 8K stitched cylindrical panorama + sky dome) and the client (seated eye heights, per-storey icons, pano view switcher); rebuilt, deployed, re-simulated (all 12 routes walkable, 46 seats at +0.75 m eye, tub eye 0.39 m above water, 0 client errors).
+  next_action: 'Headset-verify on two Quests: arms (hang by the hips when a controller is set down, elbows behind/below the shoulders, no wrist flip when rotating the hand a full turn, forearm stretches instead of the hand detaching on a full reach); the walk-in closet off the NW bedroom (door now open, ottoman seat); gym and ensuite finishes; the spa terrace; cycle day/dusk/night with the kitchen arrows (night dims ambient light and lifts the lamps).'
+  summary: Jack Pine is centred on the chimney breast by a flat-run search (verified art slots now report the wall run they sit on). The gym, walk-in closet and ensuite lost the navy/teal/espresso spill from the global palette (warm white walls, mirror panels, the bedroom's herringbone, marble ensuite floor); the closet's glass door panes were the reason it was unreachable (0 nav faces) and are gone. The SW terrace is travertine, teak decking and a teak-clad tub with travertine coping, planters, towels, sconces and a slatted soffit. Night scene = graded dusk photos stitched into a third 8K panorama plus a night sky dome, with per-scene interior light multipliers. The MetaPerson arm solver was rewritten against a headless harness (lounge-assets/avatar-arm-lab).
 pending_tasks:
 - task: Headset soak test of the new seating, walk routes, panorama corners and sky; report any seat that still feels off (Seat_T1/T6 wicker chairs verified by surface cluster only).
   priority: high
 - task: Add coturn/TURN if remote-network testing still cannot establish media through the direct public/LAN candidates.
   priority: medium
-- task: Kitchen cabinets and the gym remain plain source-model finishes; restyle only if they bother in headset.
+- task: Kitchen cabinets remain plain source-model finishes; restyle only if they bother in headset. The gym's dark rubber mats under the machines and the ensuite's navy/black-marble/mosaic mix are source finishes left as-is.
   priority: low
 session_history:
+- date: '2026-09-04'
+  summary: 'Second pass: Jack Pine centred on the breast, gym/closet/ensuite refinished (closet door opened, was unreachable), spa terrace textured, night view scene + light profiles, arm solver rewritten (humerus-root chain, elbow hint by hand position, collarbone shrug, chain stretch, continuous wrist roll both sides, relaxed pose when untracked) verified by harness + live two-client run; deployed.'
 - date: '2026-09-04'
   summary: 'Full audit/fix pass: seat waypoints onto real cushions with seated eye height, nav mesh to one component (library, dressing, bath, front door), art on verified flat walls, lobby rebuilt around the real front door, piano + plants + Qing chairs, 8K cylindrical panorama + sky dome, chest-deep hot tub; deployed and Playwright-verified.'
 - date: '2026-09-04'
@@ -22,5 +24,3 @@ session_history:
   summary: Fixed stuck teleport arc (masked stopTeleport falling edge -> level-triggered bindings in teleporting sets), thumb-touch-gated movement/snap-turn against stick drift, generic 3-pass coplanar wall dedupe (362 faces), all window views re-derived at 2K+ (Central Park 2560) with mipmaps; rebuilt, committed, deployed.
 - date: '2026-08-31'
   summary: 'Removed the west-wall picture frame that overlapped the TV panel (24 faces), redeployed and checksum-verified; audited Sat session: servers clean, one guest stuck in a 30s ICE-restart loop all night (needs TURN).'
-- date: '2026-08-30'
-  summary: 'Fixed and deployed: hand-tracking sources ignored + buttons neutralized on tracking loss, TVScreen ray-snapped proud of the west wall with buttons anchored to it, coplanar strobing wall faces deleted; build, probes, audit and live checksums all verified.'

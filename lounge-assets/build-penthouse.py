@@ -392,8 +392,20 @@ if qm and qm.use_nodes and 'Principled BSDF' in qm.node_tree.nodes:
 # --- Region painter: split faces inside a box onto a new colored material ----
 # (Material-level recolors bleed across the model's heavily shared materials —
 # the piano turning the round couch black proved it. Paint by volume instead.)
+def face_normal_ok(m3, p, normal):
+    if normal is None:
+        return True
+    n = (m3 @ p.normal).normalized()
+    if normal == 'up':
+        return n.z > 0.7
+    if normal == 'down':
+        return n.z < -0.7
+    if normal == 'side':
+        return abs(n.z) < 0.5
+    return n.dot(Vector(normal)) > 0.7
+
 REGION_MATS = {}
-def recolor_region(x1, x2, y1, y2, z1, z2, hexcol, rough=0.85, metal=0.0, label=None, only_mats=None):
+def recolor_region(x1, x2, y1, y2, z1, z2, hexcol, rough=0.85, metal=0.0, label=None, only_mats=None, normal=None, min_area=0.0):
     key = (hexcol, rough, metal)
     nm = REGION_MATS.get(key)
     if nm is None:
@@ -412,9 +424,11 @@ def recolor_region(x1, x2, y1, y2, z1, z2, hexcol, rough=0.85, metal=0.0, label=
         okidx = {i for i, n in enumerate(names)
                  if not n.startswith(("Foliage_", "Floral_"))
                  and (only_mats is None or n in only_mats)}
+        m3 = mw.to_3x3()
         sel = [p.index for p in ob.data.polygons
                if p.material_index in okidx
-               and x1 < (mw @ p.center).x < x2 and y1 < (mw @ p.center).y < y2 and z1 < (mw @ p.center).z < z2]
+               and x1 < (mw @ p.center).x < x2 and y1 < (mw @ p.center).y < y2 and z1 < (mw @ p.center).z < z2
+               and face_normal_ok(m3, p, normal) and p.area >= min_area]
         if not sel:
             continue
         if nm.name not in names:
@@ -668,6 +682,77 @@ PLANT_ME = copy_region_to_object("PlantSrc", 6.10, 6.80, 9.05, 9.70, 0.02, 1.0)
 def plant(name, x, y, z, scale=1.25, yaw=0.0):
     return place_copy(name, PLANT_ME, x, y, z, yaw, scale)
 
+# --- Textured finishes cloned from the model's own image maps -----------------
+# (No new textures: reusing the imported images costs no extra GPU memory.)
+def texmat_from(src_name, new_name, rough=0.7, metal=0.0):
+    src = bpy.data.materials.get(src_name)
+    img = next((n.image for n in src.node_tree.nodes if n.type == 'TEX_IMAGE' and n.image), None) if src else None
+    if img is None:
+        raise RuntimeError(f"texmat_from: {src_name} has no image texture")
+    m = bpy.data.materials.new(new_name)
+    m.use_nodes = True
+    nt = m.node_tree
+    b = nt.nodes['Principled BSDF']
+    t = nt.nodes.new('ShaderNodeTexImage')
+    t.image = img
+    nt.links.new(t.outputs['Color'], b.inputs['Base Color'])
+    b.inputs['Roughness'].default_value = rough
+    b.inputs['Metallic'].default_value = metal
+    return m
+
+def retex_region(x1, x2, y1, y2, z1, z2, mat, label, only_mats=None, only_objects=None, normal=None, scale=1.0, rot=0.0):
+    """Give faces inside the box an existing textured material with planar UVs
+    in world metres (the model's own maps tile once per metre), so a flat
+    colour slab becomes a properly scaled stone/wood surface."""
+    total = 0
+    cr, sr = math.cos(rot), math.sin(rot)
+    for ob in [o for o in sc.collection.all_objects if o.type == 'MESH']:
+        if ob.name.startswith(("NavMesh", "View", "Art_", "Spawn", "Seat_")):
+            continue
+        if only_objects is not None and not ob.name.startswith(tuple(only_objects)):
+            continue
+        mw = ob.matrix_world
+        m3 = mw.to_3x3()
+        names = [m.name if m else '' for m in ob.data.materials]
+        okidx = {i for i, n in enumerate(names)
+                 if not n.startswith(("Foliage_", "Floral_")) and (only_mats is None or n in only_mats)}
+        if only_mats is not None and not okidx:
+            continue
+        sel = [p for p in ob.data.polygons
+               if (only_mats is None or p.material_index in okidx)
+               and x1 < (mw @ p.center).x < x2 and y1 < (mw @ p.center).y < y2 and z1 < (mw @ p.center).z < z2
+               and face_normal_ok(m3, p, normal)]
+        if not sel:
+            continue
+        if mat.name not in names:
+            ob.data.materials.append(mat)
+            names.append(mat.name)
+        midx = names.index(mat.name)
+        if not ob.data.uv_layers:
+            ob.data.uv_layers.new(name="UVMap")
+        uv = ob.data.uv_layers.active.data
+        for p in sel:
+            p.material_index = midx
+            n = (m3 @ p.normal).normalized()
+            for li, vi in zip(p.loop_indices, p.vertices):
+                w = mw @ ob.data.vertices[vi].co
+                if abs(n.z) > 0.5:
+                    u, v = w.x, w.y
+                elif abs(n.x) > abs(n.y):
+                    u, v = w.y, w.z
+                else:
+                    u, v = w.x, w.z
+                uv[li].uv = ((u * cr - v * sr) / scale, (u * sr + v * cr) / scale)
+        total += len(sel)
+    print(f"RETEX {label}: {total} faces -> {mat.name}")
+    return total
+
+def tex_box(name, x, y, z, sx, sy, sz, mat, scale=1.0, rot=0.0):
+    add_box(name, x, y, z, sx, sy, sz, mat)
+    bpy.context.view_layer.update()
+    retex_region(x - sx - 0.02, x + sx + 0.02, y - sy - 0.02, y + sy + 0.02, z - sz - 0.02, z + sz + 0.02,
+                 mat, name, only_objects=(name,), scale=scale, rot=rot)
+
 # Preserve the source door slabs, frames and surrounding walls. Movement uses
 # the navigation links below and does not require visually carving the model.
 
@@ -834,9 +919,9 @@ add_box("ParaSWcurbW", -11.40, -7.10, 0.07, 0.03, 2.66, 0.035, M_RAIL)
 add_box("ParaSWcurbS", -9.57, -9.74, 0.07, 1.85, 0.03, 0.035, M_RAIL)
 M_TUB = mk('HotTubShell', 'E8E1D4', 0.38)
 M_TUB_INNER = mk('HotTubInner', '24444A', 0.48)
-M_WATER = mk('HotTubWater', '48B8C5', 0.08, 0.05)
+M_WATER = mk('HotTubWater', '5CC6D2', 0.06, 0.05)
 water_bsdf = M_WATER.node_tree.nodes['Principled BSDF']
-water_bsdf.inputs['Alpha'].default_value = 0.78
+water_bsdf.inputs['Alpha'].default_value = 0.70
 M_WATER.surface_render_method = 'DITHERED'
 
 tub_x, tub_y = -9.75, -7.15
@@ -1212,6 +1297,98 @@ dedupe_coplanar_walls()
 dedupe_coplanar_walls()
 dedupe_coplanar_walls()
 
+# ===================== FINISH PASS: SPA TERRACE, GYM, CLOSET, ENSUITE ========
+# Runs after decimation and the coplanar dedupe: decimation collapses faces
+# across material boundaries and merged retextured floor faces back into their
+# neighbours when this pass ran earlier.
+M_TRAV = texmat_from('20210309-221754-cet_Wall_Entity_Material', 'Travertine', 0.72)
+M_TEAK = texmat_from('20191115-193825-cet_Wall_Entity_Material', 'TeakPlank', 0.62)
+M_OAKL = texmat_from('tex_bois_scan_blanc_002_Wall_Entity_Material', 'OakLight', 0.6)
+M_PARQ = bpy.data.materials['20200606-02529-cest_Room_Entity_Material']   # herringbone (bedroom floors)
+M_MARB = bpy.data.materials['20200606-32137-cest_Room_Entity_Material']   # white marble (ensuite)
+M_MIRROR = mk('MirrorPanel', 'C9CDD1', 0.18, 0.35)
+M_TOWEL = mk('TowelIvory', 'EFE4CD', 0.95)
+M_OTTO = mk('OttomanLinen', 'C9B8A0', 0.9)
+
+# --- SW spa terrace: the flat beige/white slabs around the tub were bare -----
+# North wall (exterior face of the piano-corner wall) and the lobby's west
+# face -> travertine; the bedroom overhang gets a teak-slat soffit with
+# downlights; all decks -> teak planks; the tub gets a teak skirt and a
+# travertine coping; planters, towels and sconces dress the deck.
+retex_region(-11.5, -7.5, -5.4, -4.7, -0.2, 3.5, M_TRAV, "TerraceWallN",
+             only_mats={'FacadeSW', 'fake_mat_251_251_251_255', 'blanc_001_Wall_Entity_Material'}, normal=(0, -1, 0))
+retex_region(-7.75, -7.55, -9.8, -6.4, -0.1, 3.1, M_TRAV, "TerraceWallE", only_objects=("LobbyWallW",), normal=(-1, 0, 0))
+tex_box("SoffitSW", -9.57, -4.86, 3.20, 1.85, 0.40, 0.025, M_TEAK, scale=0.6, rot=math.pi / 2)
+for i, x in enumerate((-10.6, -9.57, -8.55)):
+    add_box(f"SoffitLightSW{i}", x, -4.86, 3.165, 0.07, 0.07, 0.012, M_GLOW)
+for nm, rot in (("DeckSW", math.pi / 2), ("DeckSE", 0.0), ("DeckWalk", 0.0)):
+    retex_region(-14, 14, -11, 0, -0.1, 0.2, M_TEAK, f"{nm}-teak", only_objects=(nm,), scale=0.75, rot=rot)
+for nm in ("HotTubWallN", "HotTubWallS", "HotTubWallW", "HotTubWallENE", "HotTubWallESE", "HotTubStepOuter"):
+    retex_region(-12, -7, -10, -4, -0.1, 1.0, M_TEAK, f"{nm}-teak", only_objects=(nm,), scale=0.5)
+for nm, (cx, cy, hx, hy) in {"TubCopN": (tub_x, -5.70, 1.48, 0.20), "TubCopS": (tub_x, -8.60, 1.48, 0.20),
+                             "TubCopW": (-11.15, tub_y, 0.20, 1.29), "TubCopENE": (-8.35, -6.14, 0.20, 0.44),
+                             "TubCopESE": (-8.35, -8.16, 0.20, 0.44)}.items():
+    tex_box(nm, cx, cy, 0.735, hx, hy, 0.018, M_TRAV)
+for i, (tx, ty) in enumerate(((-10.55, -8.60), (-10.15, -8.60))):
+    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.065, depth=0.30, location=(tx, ty, 0.82), rotation=(0, math.pi / 2, 0))
+    bpy.context.active_object.name = f"TowelSW{i}"
+    bpy.context.active_object.data.materials.append(M_TOWEL)
+for i, (px, py) in enumerate(((-10.85, -9.40), (-8.45, -9.40))):
+    tex_box(f"PlanterSW{i}", px, py, 0.27, 0.28, 0.22, 0.24, M_TRAV)
+    plant(f"PlanterSWplant{i}", px, py, 0.50, 1.0, 0.6 + i)
+for i, x in enumerate((-10.7, -9.57, -8.45)):
+    add_box(f"SconceSW{i}", x, -5.15, 2.05, 0.05, 0.03, 0.14, M_GLOW)
+
+# --- Gym: the global palette spilled navy, teal and espresso into this room.
+# Warm white walls, mirror panels, herringbone floor.
+GYM = (-4.65, -0.95, -6.85, -4.35)
+recolor_region(*GYM, 3.45, 6.35, "E6DFD3", rough=0.9, label="GymWall",
+               only_mats={'blanc_001_Wall_Entity_Material', 'beige_006_Wall_Entity_Material',
+                          'enduit_004_Wall_Entity_Material', 'gris_002_Wall_Entity_Material', 'FacadeSW'})
+recolor_region(*GYM, 4.75, 6.35, "E6DFD3", rough=0.9, label="GymWallUpper", only_mats={'fake_mat_35_32_34_255'}, normal='side')
+recolor_region(*GYM, 3.45, 6.35, "E6DFD3", rough=0.9, label="GymWallPanels", only_mats={'fake_mat_35_32_34_255'}, normal='side', min_area=0.15)
+recolor_region(*GYM, 3.45, 6.35, "C9CDD1", rough=0.18, metal=0.35, label="GymMirror", only_mats={'fake_mat_157_154_155_255'})
+# West wall of the gym/hall: full-height espresso panels (the blind material) at x -5.3.
+recolor_region(-5.6, -5.0, -7.0, -1.7, 3.45, 6.4, "E6DFD3", rough=0.9, label="GymWallWest",
+               only_mats={'fake_mat_6_5_5_255'}, normal='side', min_area=1.0)
+# The open gym/hall floor is one large slab that reaches under the north wall
+# and out to the west facade, so the floor box is wider than the room.
+retex_region(-5.5, -0.95, -6.85, -3.9, 3.45, 3.62, M_PARQ, "GymFloor",
+             only_mats={'fake_mat_6_5_5_255', '20200803-11010-cest_Room_Entity_Material',
+                        'enduit_004_Room_Entity_Material', 'parquet_022_Room_Entity_Material'}, normal='up')
+
+# --- NW bedroom walk-in closet: a bare dark-grey wardrobe carcass with a
+# black floor behind a closed glass door. Open the door, lay the bedroom's
+# herringbone, plaster the walls, light-oak shelves, rails, mirror, ottoman,
+# ceiling light.
+CL = (-11.15, -7.30, 0.85, 3.45)
+region_delete_mats(-10.05, -8.03, 3.40, 3.65, 3.55, 5.72, {GLASS_MAT}, "closet-door-panes")
+retex_region(*CL, 3.45, 3.62, M_PARQ, "ClosetFloor",
+             only_mats={'fake_mat_6_5_5_255', 'fake_mat_35_32_34_255', 'gris_006_Room_Entity_Material',
+                        'enduit_004_Room_Entity_Material'}, normal='up')
+recolor_region(*CL, 6.0, 6.45, "F1ECE4", rough=0.9, label="ClosetCeil", only_mats={'fake_mat_35_32_34_255'}, normal='down')
+retex_region(*CL, 3.62, 6.0, M_OAKL, "ClosetShelvesUp", only_mats={'fake_mat_35_32_34_255'}, normal='up', scale=0.8)
+retex_region(*CL, 3.62, 6.0, M_OAKL, "ClosetShelvesDown", only_mats={'fake_mat_35_32_34_255'}, normal='down', scale=0.8)
+recolor_region(*CL, 3.45, 6.45, "E7E0D4", rough=0.9, label="ClosetWall", only_mats={'fake_mat_35_32_34_255'}, normal='side')
+recolor_region(*CL, 3.45, 6.45, "B9B3AA", rough=0.4, metal=0.3, label="ClosetRail", only_mats={'fake_mat_196_192_184_255'})
+add_box("ClosetLight", -9.2, 2.45, 6.22, 0.9, 0.35, 0.015, M_GLOW)
+add_box("ClosetMirror", -9.2, 1.432, 4.80, 0.55, 0.006, 1.05, M_MIRROR)
+add_box("ClosetOttoman", -9.2, 2.30, 3.70, 0.45, 0.22, 0.19, M_OTTO)
+
+# --- Ensuite behind the closet: the camel recolour hit its white fixtures ----
+EN = (-11.15, -7.30, -1.75, 0.80)
+recolor_region(*EN, 3.45, 6.45, "F0ECE6", rough=0.85, label="EnsuiteWhite", only_mats={'fake_mat_251_251_251_255'})
+recolor_region(*EN, 3.45, 6.45, "F0ECE6", rough=0.85, label="EnsuiteWalls",
+               only_mats={'fake_mat_35_32_34_255', 'beige_006_Wall_Entity_Material'}, normal='side', min_area=0.15)
+# Inner faces of the ensuite's north (wardrobe back) and south walls sit just
+# outside the room box; pick them by facing direction so the closet and the
+# SW bedroom sides of those walls keep their own colours.
+recolor_region(-11.4, -7.2, 0.75, 0.92, 3.45, 6.45, "F0ECE6", rough=0.85, label="EnsuiteWallN",
+               only_mats={'fake_mat_35_32_34_255', 'beige_006_Wall_Entity_Material'}, normal=(0, -1, 0), min_area=0.15)
+recolor_region(-11.4, -7.2, -2.0, -1.5, 3.45, 6.45, "F0ECE6", rough=0.85, label="EnsuiteWallS",
+               only_mats={'fake_mat_35_32_34_255', 'beige_006_Wall_Entity_Material'}, normal=(0, 1, 0), min_area=0.15)
+retex_region(*EN, 3.45, 3.62, M_MARB, "EnsuiteFloor", only_mats={'fake_mat_6_5_5_255', 'fake_mat_35_32_34_255'}, normal='up')
+
 # --- Seats: authored spots, snapped onto the real seat surfaces --------------
 # name, x, y, expected seat-surface z, yaw_deg
 # yaw: avatar facing after glTF export (empty -Y): 0=-y  90=+x  180=+y  -90=-x
@@ -1280,6 +1457,8 @@ SEATS = [
     ("Seat_S3", 2.20, -9.22, 3.87, 180),
     # Piano bench (pianist faces the keyboard, -x)
     ("Seat_Pno", PIANO_SEAT.x, PIANO_SEAT.y, 0.50, -90),
+    # Walk-in closet ottoman, facing the mirror (-y)
+    ("Seat_Closet", -9.2, 2.30, 3.89, 0),
 ]
 
 # Floors sit far below any expected seat height, so the z window already
@@ -1538,6 +1717,7 @@ NAV_LINKS = [
 for link_args in NAV_LINKS:
     connect_nav_regions(*link_args)
 connect_nav_regions("ground-library-closet", (-1.6, -4.7, 0.0), (-2.0, -5.7, 0.0), (-1.62, -5.15, 0.02), 0.6, optional=True)
+connect_nav_regions("upper-nw-closet", (-8.3, 5.5, 3.5), (-9.2, 2.6, 3.5), (-9.5, 3.52, 3.52), 0.7, optional=True)
 
 # Everything that is not face-connected to the ground lounge is unreachable on
 # foot (closets behind doors, showers behind glass, slivers between furniture
@@ -1592,6 +1772,7 @@ NAV_REQUIRED = {
     "se terrace deck": (8.5, -6.0, 0.07),
     "upper NW dressing": (-9.2, -0.3, 3.5),
     "upper east bath": (9.9, 2.6, 3.5),
+    "upper NW closet": (-9.2, 2.6, 3.5),
 }
 required_components = {}
 for label, point in NAV_REQUIRED.items():
@@ -1689,7 +1870,7 @@ YAWS = {"+x": math.pi / 2, "-x": -math.pi / 2, "+y": math.pi, "-y": 0.0}
 DIRV = {"+x": Vector((-1, 0, 0)), "-x": Vector((1, 0, 0)), "+y": Vector((0, -1, 0)), "-y": Vector((0, 1, 0))}
 GALLERY = [
     # Group of Seven: Jack Pine over the lounge fireplace (chimney breast).
-    ("Art_JackPine", "jackpine.jpg", [("+x", -10.44, 4.2, 3.5, 4.95, 2.15)], 1.0),
+    ("Art_JackPine", "jackpine.jpg", [("+x", -10.44, 4.04, 3.4, 4.7, 2.15)], 1.0),
     # Starry Night on the piano corner's west wall (first clean run).
     ("Art_Starry", "starrynight.jpg", [("+x", -10.96, -3.0, -5.6, 0.6, 1.6)], 1.2),
     # Lobby north wall, both at eye level, either side of the runner.
@@ -1712,6 +1893,7 @@ GALLERY = [
     # Tangled Garden in the sky den (north wall).
     ("Art_Tangled", "tangledgarden.jpg", [("-y", -7.10, 2.6, 0.3, 3.7, 5.05)], 0.85),
 ]
+CENTRE_ON_WALL = {"Art_JackPine"}
 framemat = mat_frame = bpy.data.materials.new('ArtFrame')
 mat_frame.use_nodes = True
 fb = mat_frame.node_tree.nodes['Principled BSDF']
@@ -1741,6 +1923,24 @@ def art_slot(name, facing, wall_c, u_pref, u_min, u_max, z, w, h):
         if max(depths) - min(depths) > 0.015:
             return None
         return sum(depths) / len(depths)
+    def flat_extent(u0, depth):
+        # Walk outward along the wall while the surface stays at the same
+        # depth (a chimney breast, a pier): the run the piece should centre on.
+        def same(uu):
+            origin = (Vector((wall_c, uu, z)) if horiz else Vector((uu, wall_c, z))) - d * 0.6
+            ok, loc, nrm, fi, ob, mw = sc.ray_cast(dga, origin, d, distance=1.2)
+            if not ok or ob.name.startswith(("Art_", "NavMesh", "View", "Spawn", "Seat_")):
+                return False
+            mats = ob.data.materials
+            mi = ob.data.polygons[fi].material_index if fi < len(ob.data.polygons) else 0
+            mn = mats[mi].name if mats and mi < len(mats) and mats[mi] else ''
+            return mn != GLASS_MAT and abs(nrm.z) <= 0.3 and nrm.dot(-d) >= 0.7 and abs((loc - origin).length - depth) <= 0.015
+        lo = hi = u0
+        while lo - 0.03 > u0 - 4.0 and same(lo - 0.03):
+            lo -= 0.03
+        while hi + 0.03 < u0 + 4.0 and same(hi + 0.03):
+            hi += 0.03
+        return lo, hi
     order = [u_pref]
     for k in range(1, 80):
         for u in (u_pref + 0.1 * k, u_pref - 0.1 * k):
@@ -1749,6 +1949,16 @@ def art_slot(name, facing, wall_c, u_pref, u_min, u_max, z, w, h):
     for u in order:
         depth = probe(u)
         if depth is not None:
+            lo, hi = flat_extent(u, depth)
+            print(f"GALLERY {name}: flat run u {lo:.2f}..{hi:.2f} ({hi - lo:.2f} m) around u={u:.2f}")
+            if name in CENTRE_ON_WALL:
+                uc = (lo + hi) / 2
+                dc = probe(uc)
+                if w + 0.1 <= hi - lo < 4.0 and dc is not None:
+                    print(f"GALLERY {name}: centred on the run at u={uc:.2f} (was {u:.2f})")
+                    u, depth = uc, dc
+                else:
+                    raise RuntimeError(f"GALLERY {name}: cannot centre on run {lo:.2f}..{hi:.2f}")
             origin = (Vector((wall_c, u, z)) if horiz else Vector((u, wall_c, z))) - d * 0.6
             surf = origin + d * depth
             pos = surf - d * 0.025
