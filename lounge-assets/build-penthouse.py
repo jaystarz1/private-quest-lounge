@@ -909,7 +909,7 @@ plant("LobbyPlantW", -7.05, -9.3, 0.04, 1.2, 0.4)
 plant("LobbyPlantE", -1.75, -9.3, 0.04, 1.2, 2.1)
 
 # --- SW terrace: accessible four-person hot tub ------------------------------
-add_box("DeckSW", -9.57, -7.10, 0.07, 1.85, 2.66, 0.03, M_DECK)
+add_box("DeckSW", -9.57, -7.48, 0.07, 1.85, 2.28, 0.03, M_DECK)   # y -9.76..-5.20; the sill band continues to the wall
 if M_GLASSP:
     add_box("ParaSWglassW", -11.40, -7.10, 0.625, 0.015, 2.66, 0.525, M_GLASSP)
     add_box("ParaSWglassS", -9.57, -9.74, 0.625, 1.85, 0.015, 0.525, M_GLASSP)
@@ -948,9 +948,11 @@ for i, (dx, dy, rr) in enumerate(((-0.42, 0.18, 0.035), (-0.12, -0.31, 0.025),
                                         location=(tub_x + dx, tub_y + dy, 0.595))
     bpy.context.active_object.name = f"HotTubBubble_{i}"
     bpy.context.active_object.data.materials.append(M_TUB)
-plant("TerrSWplant1", -8.2, -4.75, 0.04, 1.5, 0.8)
-plant("TerrSWplant2", -11.0, -4.75, 0.04, 1.5, 2.6)
-for i, (bx, by) in enumerate(((-11.15, -9.45), (-7.95, -9.45), (-11.15, -4.75))):
+# (The first build stood these two INSIDE the wall cavity at y -4.75, where
+# they showed through the piano-room niche instead of on the deck.)
+plant("TerrSWplant1", -6.95, -5.60, 0.04, 1.5, 0.8)
+plant("TerrSWplant2", -6.05, -5.55, 0.04, 1.5, 2.6)
+for i, (bx, by) in enumerate(((-11.15, -9.45), (-7.95, -9.45), (-7.58, -6.42))):
     add_box(f"BollSW{i}", bx, by, 0.32, 0.045, 0.045, 0.32, M_RAIL)
     add_box(f"BollSWg{i}", bx, by, 0.60, 0.05, 0.05, 0.028, M_GLOW)
 
@@ -1310,17 +1312,133 @@ M_MIRROR = mk('MirrorPanel', 'C9CDD1', 0.18, 0.35)
 M_TOWEL = mk('TowelIvory', 'EFE4CD', 0.95)
 M_OTTO = mk('OttomanLinen', 'C9B8A0', 0.9)
 
-# --- SW spa terrace: the flat beige/white slabs around the tub were bare -----
-# North wall (exterior face of the piano-corner wall) and the lobby's west
-# face -> travertine; the bedroom overhang gets a teak-slat soffit with
-# downlights; all decks -> teak planks; the tub gets a teak skirt and a
-# travertine coping; planters, towels and sconces dress the deck.
-retex_region(-11.5, -7.5, -5.4, -4.7, -0.2, 3.5, M_TRAV, "TerraceWallN",
-             only_mats={'FacadeSW', 'fake_mat_251_251_251_255', 'blanc_001_Wall_Entity_Material'}, normal=(0, -1, 0))
-retex_region(-7.75, -7.55, -9.8, -6.4, -0.1, 3.1, M_TRAV, "TerraceWallE", only_objects=("LobbyWallW",), normal=(-1, 0, 0))
-tex_box("SoffitSW", -9.57, -4.86, 3.20, 1.85, 0.40, 0.025, M_TEAK, scale=0.6, rot=math.pi / 2)
-for i, x in enumerate((-10.6, -9.57, -8.55)):
-    add_box(f"SoffitLightSW{i}", x, -4.86, 3.165, 0.07, 0.07, 0.012, M_GLOW)
+# --- SW spa terrace ----------------------------------------------------------
+# Walls, in order from the tub: the door wall (travertine, y -5.14) with the
+# glazed patio door, the piano room's west return (travertine), the upper
+# storey above the fascia (board-marked concrete), the lobby block (dark
+# timber cladding, west and north faces), and the pocket's east wall (brick).
+# Each wall a different material so the enclosure reads as separate planes.
+M_CONC = texmat_from('20200612-21477-cest', 'ConcreteRender', 0.92)
+M_WENGE = texmat_from('bois_003_Wall_Entity_Material', 'WengeCladding', 0.55)
+M_BRICK = texmat_from('brique_009_Wall_Entity_Material', 'BrickWall', 0.95)
+M_BRONZE = mk('DoorBronze', '2A2622', 0.45, 0.3)
+WALLMATS = {'FacadeSW', 'noir_001_Wall_Entity_Material', 'noir_001_Room_Entity_Material', 'fake_mat_251_251_251_255',
+            'blanc_001_Wall_Entity_Material', 'Travertine', 'gris_004_Wall_Entity_Material', 'LobbyWall'}
+
+def cut_opening(x1, x2, y1, y2, z1, z2, label, name_prefix=("Object_",)):
+    """Carve a rectangular hole through source wall sheets: bisect every face
+    that straddles the box (plus its edge neighbours, so the cut edge is
+    shared) on the box's x/y/z bounds, then delete the pieces inside."""
+    planes = ((Vector((x1, 0, 0)), Vector((1, 0, 0))), (Vector((x2, 0, 0)), Vector((1, 0, 0))),
+              (Vector((0, 0, z1)), Vector((0, 0, 1))), (Vector((0, 0, z2)), Vector((0, 0, 1))),
+              (Vector((0, y1, 0)), Vector((0, 1, 0))), (Vector((0, y2, 0)), Vector((0, 1, 0))))
+    total = 0
+    for ob in [o for o in sc.collection.all_objects if o.type == 'MESH' and o.name.startswith(name_prefix)]:
+        mw = ob.matrix_world
+        inv = mw.inverted()
+        m3t = mw.to_3x3().transposed()
+        bmc = bmesh.new()
+        bmc.from_mesh(ob.data)
+        def straddling():
+            out = []
+            for f in bmc.faces:
+                ws = [mw @ v.co for v in f.verts]
+                if (max(w.x for w in ws) > x1 and min(w.x for w in ws) < x2 and max(w.y for w in ws) > y1
+                        and min(w.y for w in ws) < y2 and max(w.z for w in ws) > z1 and min(w.z for w in ws) < z2):
+                    out.append(f)
+            return out
+        if not straddling():
+            bmc.free()
+            continue
+        for co, no in planes:
+            cand = straddling()
+            if not cand:
+                break
+            faces = set(cand)
+            for f in cand:
+                for e in f.edges:
+                    faces.update(e.link_faces)
+            verts = {v for f in faces for v in f.verts}
+            edges = {e for f in faces for e in f.edges}
+            bmesh.ops.bisect_plane(bmc, geom=list(verts) + list(edges) + list(faces), dist=1e-4,
+                                   plane_co=inv @ co, plane_no=(m3t @ no).normalized(),
+                                   use_snap_center=False, clear_outer=False, clear_inner=False)
+        doomed = []
+        for f in bmc.faces:
+            c = mw @ f.calc_center_median()
+            if x1 < c.x < x2 and y1 < c.y < y2 and z1 < c.z < z2:
+                doomed.append(f)
+        if doomed:
+            bmesh.ops.delete(bmc, geom=doomed, context='FACES')
+            total += len(doomed)
+        bmc.to_mesh(ob.data)
+        bmc.free()
+        print(f"CUT {label}: {ob.name} -{len(doomed)} faces")
+    bpy.context.view_layer.update()
+    print(f"CUT {label}: {total} faces removed")
+
+# Patio door. The source piano room has a 4.2 m sliding-door opening in its
+# south wall (frame Object_67: posts x -10.33..-10.13 and -6.29..-6.09, head
+# z 2.70..2.81) that led into a 0.5 m cavity closed by two solid exterior
+# sheets (y -4.94 and -5.14), so from the piano it read as a navy niche.
+# Carve both sheets between the posts, line the reveal with travertine and
+# glaze the frame: a fixed pane at each end with a leaf slid open against it,
+# leaving a 1.9 m walkable gap onto the deck.
+DOOR_X1, DOOR_X2, DOOR_Z = -10.13, -6.29, 2.70
+DOOR_CX = (DOOR_X1 + DOOR_X2) / 2
+cut_opening(DOOR_X1, DOOR_X2, -5.25, -4.405, 0.05, DOOR_Z, "patio-door")
+tex_box("PatioJambW", DOOR_X1 - 0.10, -4.82, 1.42, 0.10, 0.36, 1.42, M_TRAV)
+tex_box("PatioJambE", DOOR_X2 + 0.10, -4.82, 1.42, 0.10, 0.36, 1.42, M_TRAV)
+tex_box("PatioHead", DOOR_CX, -4.82, DOOR_Z + 0.07, (DOOR_X2 - DOOR_X1) / 2 + 0.10, 0.36, 0.07, M_TRAV)
+# Threshold band along the whole wall foot at deck height (y -5.20..-4.40).
+tex_box("PatioSill", -8.47, -4.80, 0.05, 2.95, 0.40, 0.05, M_TRAV)
+PANE_W = (DOOR_X2 - DOOR_X1) / 4
+def door_panel(name, x0, y, z_top):
+    cx = x0 + PANE_W / 2
+    add_box(f"{name}Rail0", cx, y, 0.14, PANE_W / 2, 0.022, 0.04, M_BRONZE)
+    add_box(f"{name}Rail1", cx, y, z_top - 0.035, PANE_W / 2, 0.022, 0.035, M_BRONZE)
+    add_box(f"{name}StileW", x0 + 0.022, y, (0.10 + z_top) / 2, 0.022, 0.022, (z_top - 0.10) / 2, M_BRONZE)
+    add_box(f"{name}StileE", x0 + PANE_W - 0.022, y, (0.10 + z_top) / 2, 0.022, 0.022, (z_top - 0.10) / 2, M_BRONZE)
+    if M_GLASSP:
+        add_box(f"{name}Glass", cx, y, (0.18 + z_top - 0.07) / 2, PANE_W / 2 - 0.04, 0.004, (z_top - 0.07 - 0.18) / 2, M_GLASSP)
+door_panel("PatioPaneW", DOOR_X1, -4.40, DOOR_Z)                     # fixed, outer track
+door_panel("PatioLeafW", DOOR_X1 + 0.02, -4.33, DOOR_Z)              # slid open against it
+door_panel("PatioPaneE", DOOR_X2 - PANE_W, -4.40, DOOR_Z)
+door_panel("PatioLeafE", DOOR_X2 - PANE_W - 0.02, -4.33, DOOR_Z)
+add_box("PatioTrack", DOOR_CX, -4.365, DOOR_Z - 0.012, (DOOR_X2 - DOOR_X1) / 2, 0.06, 0.012, M_BRONZE)
+for nm, hx in (("PatioHandleW", DOOR_X1 + PANE_W + 0.02 - 0.045), ("PatioHandleE", DOOR_X2 - PANE_W - 0.02 + 0.045)):
+    add_box(nm, hx, -4.33, 1.05, 0.012, 0.035, 0.16, M_BRONZE)
+
+# Door wall and the piano room's west return: travertine over every layer
+# (decimated triangles whose centres fell outside the first build's box
+# stayed khaki, which showed as a diagonal seam).
+retex_region(-11.5, -5.3, -5.4, -4.9, -0.3, 3.24, M_TRAV, "TerraceWallN", only_mats=WALLMATS, normal=(0, -1, 0))
+retex_region(-11.3, -11.0, -5.5, -1.5, -0.3, 3.24, M_TRAV, "TerraceWallNW", only_mats=WALLMATS, normal=(-1, 0, 0))
+# Chamfer slivers at the wall's west end (no dominant normal), plus a source
+# facade fin (dark window-frame material, x -11.8, outside the parapet) that
+# read as a dark wedge from the tub's north-west corner.
+retex_region(-11.5, -10.9, -5.6, -4.3, -0.3, 3.24, M_TRAV, "TerraceWallWEnd", only_mats=WALLMATS)
+region_delete_mats(-12.6, -11.45, -6.0, -3.5, -0.3, 3.6, {'fake_mat_6_5_5_255', 'fake_mat_69_64_65_255', 'noir_001_Wall_Entity_Material', 'noir_001_Room_Entity_Material'}, "west-facade-fin")
+# Underside of the upper slab's 16 cm overhang, right above the fascia: teak to match.
+retex_region(-11.4, -5.3, -5.45, -4.95, 3.20, 3.30, M_TEAK, "SlabEdgeSW", only_mats={'enduit_004_Room_Entity_Material', 'enduit_004_Wall_Entity_Material', 'blanc_001_ovcol565656colpic12contpic10_Room_Entity_Material'}, normal='down', scale=0.6, rot=math.pi / 2)
+# Upper storey: board-marked concrete on every south-side facade face above
+# the ground-floor walls (the SW bedroom wall over the fascia, the wall above
+# the lobby and the covered walk, the SE terrace's upper faces).
+retex_region(-11.6, -5.3, -5.6, -5.0, 3.24, 6.8, M_CONC, "FacadeSWUpper", only_mats=WALLMATS, normal=(0, -1, 0), scale=2.0)
+retex_region(-11.6, 11.7, -10.6, -4.9, 3.24, 6.8, M_CONC, "FacadeSouthUpper", only_mats={'FacadeSW'}, normal='side', scale=2.0)
+# Lobby block: dark timber cladding on its west face and on the north face
+# that closes the pocket (walls, door head, the floor and ceiling slab edges).
+retex_region(-7.72, -7.50, -9.9, -6.5, -0.1, 3.1, M_WENGE, "LobbyWestClad", only_objects=("Lobby",), normal=(-1, 0, 0))
+retex_region(-7.72, -5.40, -6.70, -6.45, -0.1, 3.1, M_WENGE, "LobbyNorthClad", only_objects=("Lobby",), normal=(0, 1, 0))
+# Pocket east wall (the library block's west face, x -5.48): brick.
+retex_region(-5.6, -5.3, -6.7, -5.0, -0.3, 3.24, M_BRICK, "PocketBrick", only_mats=WALLMATS, normal=(-1, 0, 0), scale=0.8)
+# Teak deck continues into the pocket so the terrace is one L-shaped floor.
+add_box("DeckSWpocket", -6.62, -5.90, 0.07, 1.10, 0.70, 0.03, M_DECK)
+# Fascia strip with downlights across the whole door wall (the lights sat
+# inside the wall before, y -4.86, and never showed).
+tex_box("SoffitSW", -8.47, -4.86, 3.20, 2.95, 0.40, 0.025, M_TEAK, scale=0.6, rot=math.pi / 2)
+for i, x in enumerate((-10.75, -9.6, -8.47, -7.35, -6.2)):
+    add_box(f"SoffitLightSW{i}", x, -5.205, 3.163, 0.07, 0.045, 0.012, M_GLOW)
 for nm, rot in (("DeckSW", math.pi / 2), ("DeckSE", 0.0), ("DeckWalk", 0.0)):
     retex_region(-14, 14, -11, 0, -0.1, 0.2, M_TEAK, f"{nm}-teak", only_objects=(nm,), scale=0.75, rot=rot)
 for nm in ("HotTubWallN", "HotTubWallS", "HotTubWallW", "HotTubWallENE", "HotTubWallESE", "HotTubStepOuter"):
@@ -1336,8 +1454,29 @@ for i, (tx, ty) in enumerate(((-10.55, -8.60), (-10.15, -8.60))):
 for i, (px, py) in enumerate(((-10.85, -9.40), (-8.45, -9.40))):
     tex_box(f"PlanterSW{i}", px, py, 0.27, 0.28, 0.22, 0.24, M_TRAV)
     plant(f"PlanterSWplant{i}", px, py, 0.50, 1.0, 0.6 + i)
-for i, x in enumerate((-10.7, -9.57, -8.45)):
+# Sconces on the travertine piers either side of the door.
+for i, x in enumerate((-10.75, -5.80)):
     add_box(f"SconceSW{i}", x, -5.15, 2.05, 0.05, 0.03, 0.14, M_GLOW)
+
+# Every add_box is its own draw call on the Quest; fold the door's parts and the
+# terrace glow bits into one mesh per material (world positions are kept).
+def join_objects(name, prefixes):
+    obs = [o for o in sc.collection.all_objects if o.type == 'MESH' and o.name.startswith(tuple(prefixes))]
+    if len(obs) < 2:
+        return
+    bpy.ops.object.select_all(action='DESELECT')
+    for o in obs:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = obs[0]
+    bpy.ops.object.join()
+    bpy.context.active_object.name = name
+    bpy.ops.object.select_all(action='DESELECT')
+    print(f"JOIN {name}: {len(obs)} objects -> 1")
+
+join_objects("PatioGlass", ("PatioPaneWGlass", "PatioPaneEGlass", "PatioLeafWGlass", "PatioLeafEGlass"))
+join_objects("PatioFrame", ("PatioPane", "PatioLeaf", "PatioTrack", "PatioHandle"))
+join_objects("PatioStone", ("PatioJamb", "PatioHead", "PatioSill"))
+join_objects("TerraceGlowSW", ("SoffitLightSW", "SconceSW"))
 
 # --- Gym: the global palette spilled navy, teal and espresso into this room.
 # Warm white walls, mirror panels, herringbone floor.
@@ -1372,6 +1511,19 @@ retex_region(*CL, 3.62, 6.0, M_OAKL, "ClosetShelvesDown", only_mats={'fake_mat_3
 recolor_region(*CL, 3.45, 6.45, "E7E0D4", rough=0.9, label="ClosetWall", only_mats={'fake_mat_35_32_34_255'}, normal='side')
 recolor_region(*CL, 3.45, 6.45, "B9B3AA", rough=0.4, metal=0.3, label="ClosetRail", only_mats={'fake_mat_196_192_184_255'})
 add_box("ClosetLight", -9.2, 2.45, 6.22, 0.9, 0.35, 0.015, M_GLOW)
+# Full-length reflecting mirror on the bedroom's south wall (navy run between
+# the closet opening and the entry door, wall face y 3.63). The empty is tagged
+# `mirror` by inject-hubs.mjs; the client puts a Reflector plane on it, sized by
+# the node's scale (Blender x = width, z = height) and facing the node's -y.
+# Rotated 180 degrees so it faces north into the room. Dark frame behind it.
+# (The room is on the +y side of this wall: the first placement put both
+# inside the wall and nothing showed.)
+add_box("MirrorFrameNW", -7.45, 3.647, 4.50, 0.50, 0.014, 1.00, M_DARK)
+_mir = bpy.data.objects.new("Mirror_NW", None)
+_mir.location = (-7.45, 3.668, 4.50)
+_mir.rotation_euler = (0.0, 0.0, math.pi)
+_mir.scale = (0.92, 1.0, 1.92)
+sc.collection.objects.link(_mir)
 add_box("ClosetMirror", -9.2, 1.432, 4.80, 0.55, 0.006, 1.05, M_MIRROR)
 add_box("ClosetOttoman", -9.2, 2.30, 3.70, 0.45, 0.22, 0.19, M_OTTO)
 
@@ -1698,6 +1850,8 @@ NAV_LINKS = [
     # y -4.5) and the bookcase end at x -3.1..-2.8 leaves a strip the 0.25 m
     # grid cannot fit. Bridge the strip.
     ("ground-library", (-7.5, 6.0, 0.0), (-4.0, -5.3, 0.0), (-3.18, -4.62, 0.02), 0.5),
+    # Patio door: piano room -> SW deck through the open leaves (x -9.15..-7.27).
+    ("ground-patio-door", (-8.2, -3.0, 0.02), (-7.95, -6.3, 0.07), (-8.2, -4.60, 0.10), 1.0),
     # NW dressing room: 0.6 m door at x -10.1..-9.6 through the y~-1.4 partition
     # to the vestibule north of the SW bedroom.
     ("upper-nw-dressing", (-8.0, -3.0, 3.5), (-9.2, -0.3, 3.5), (-9.88, -1.67, 3.52), 0.6),
@@ -1769,6 +1923,8 @@ NAV_REQUIRED = {
     "ground dining": (6.5, 6.0, 0.0),
     "ground vestibule": (0.2, -7.6, 0.0),
     "sw terrace deck": (-7.95, -6.3, 0.07),
+    "sw terrace pocket": (-6.3, -6.1, 0.10),
+    "patio door threshold": (-8.2, -4.60, 0.10),
     "se terrace deck": (8.5, -6.0, 0.07),
     "upper NW dressing": (-9.2, -0.3, 3.5),
     "upper east bath": (9.9, 2.6, 3.5),
@@ -1854,8 +2010,8 @@ if tv_wall_x is None:
 tv = plane("TVScreen", 2.6, 1.5, tv_wall_x + 0.03, 6.8, 1.9, 0, dark)
 tv.rotation_euler = (0, 0, math.pi / 2)
 print(f"TVSCREEN wall at x={tv_wall_x:.3f}, panel at x={tv_wall_x + 0.03:.3f}")
-mon = plane("MonitorScreen", 1.06, 0.6, 9.9, -0.78, 1.25, 0, dark)
-mon.rotation_euler = (0, 0, math.pi)  # flip to face +y (toward the bar stools)
+# (The second screen-share display that stood on the kitchen counter behind the
+# bar stools is gone at Jay's request, 2026-09-05; tv.js copes without it.)
 
 # --- Gallery: public-domain masters on the perimeter walls -------------------
 # (name, image, facing, wall coord, preferred centre, search min, search max, z, height)

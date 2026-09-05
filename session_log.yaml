@@ -1,11 +1,11 @@
 meta:
-  last_updated: '2026-09-04'
+  last_updated: '2026-09-05'
   purpose: Operational continuity for the private Quest lounge
 current_state:
-  active_task: 'Second review pass: fireplace art centring, gym and closet finishes, spa terrace, night view scene, MetaPerson arm solver rewrite'
+  active_task: 'Third pass: patio door onto the spa terrace, terrace walls rebuilt, arm solver tracking-loss glide, kitchen-counter monitor removed, night/dusk Central Park realigned, reflecting mirror in the NW bedroom'
   status: complete
-  next_action: 'Headset-verify on two Quests: arms (hang by the hips when a controller is set down, elbows behind/below the shoulders, no wrist flip when rotating the hand a full turn, forearm stretches instead of the hand detaching on a full reach); the walk-in closet off the NW bedroom (door now open, ottoman seat); gym and ensuite finishes; the spa terrace; cycle day/dusk/night with the kitchen arrows (night dims ambient light and lifts the lamps).'
-  summary: Jack Pine is centred on the chimney breast by a flat-run search (verified art slots now report the wall run they sit on). The gym, walk-in closet and ensuite lost the navy/teal/espresso spill from the global palette (warm white walls, mirror panels, the bedroom's herringbone, marble ensuite floor); the closet's glass door panes were the reason it was unreachable (0 nav faces) and are gone. The SW terrace is travertine, teak decking and a teak-clad tub with travertine coping, planters, towels, sconces and a slatted soffit. Night scene = graded dusk photos stitched into a third 8K panorama plus a night sky dome, with per-scene interior light multipliers. The MetaPerson arm solver was rewritten against a headless harness (lounge-assets/avatar-arm-lab).
+  next_action: 'Headset-verify on two Quests: walk from the piano through the open centre of the glass door onto the deck and back; look at the four terrace walls (travertine door wall, brick pocket wall, dark timber lobby block, concrete upper storey) from the tub; set a controller down while a hand is raised and watch the other avatar''s arm ease down instead of snapping; cycle day/dusk/night at the kitchen arrows and check Central Park sits in the same place at night as by day (north-west of the lounge windows); stand in front of the mirror on the NW bedroom''s south wall (between the closet opening and the entry door) to see your own avatar; the kitchen-counter monitor is gone.'
+  summary: 'The piano room''s south wall was a sandwich (source 4.2 m sliding-door frame, 0.5 m cavity, two solid sheets) that read as a navy niche; the sheets are cut between the frame posts and the frame is glazed with two fixed panes and two leaves slid open (1.9 m walkable gap, nav route piano -> deck now 3.3 m). Terrace walls: travertine door wall, board-marked concrete upper storey, wenge-clad lobby block, brick pocket wall, teak deck extended into the pocket, plants/bollard/sconces/downlights moved out of the wall cavity where the first build had left them. Arm solver: a controller losing tracking eases to the relaxed pose over 0.2 s and glides back over 0.5 s (was a 0.9 m one-frame snap), elbow hint keeps last-frame continuity when the hand lies along the hint, forearm roll unwrap bounded at 270 degrees; verified by the harness path/toggle test and a two-client live run. Later the same day: the second screen-share monitor on the kitchen counter removed (tv.js copes), the dusk/night north photo flipped and nudged in make-pano.py so Central Park sits where the day pano has it (it had been 45 degrees to the right), and a real Reflector mirror (Mirror_NW node tagged by inject-hubs.mjs) on the NW bedroom''s south wall so you can see your own avatar.'
 pending_tasks:
 - task: Headset soak test of the new seating, walk routes, panorama corners and sky; report any seat that still feels off (Seat_T1/T6 wicker chairs verified by surface cluster only).
   priority: high
@@ -14,6 +14,8 @@ pending_tasks:
 - task: Kitchen cabinets remain plain source-model finishes; restyle only if they bother in headset. The gym's dark rubber mats under the machines and the ensuite's navy/black-marble/mosaic mix are source finishes left as-is.
   priority: low
 session_history:
+- date: '2026-09-05'
+  summary: 'Third pass: glazed patio door cut through the piano room''s south wall onto the spa terrace (walkable, nav-gated), terrace walls given distinct finishes (travertine/concrete/wenge/brick) with the deck extended into the pocket, door parts joined into single meshes; arm solver eases across tracking loss/recovery instead of snapping (harness toggle test + paths.mjs continuity test added); kitchen-counter monitor removed, dusk/night Central Park realigned, reflecting mirror in the NW bedroom; rebuilt, deployed, two-client verified.'
 - date: '2026-09-04'
   summary: 'Second pass: Jack Pine centred on the breast, gym/closet/ensuite refinished (closet door opened, was unreachable), spa terrace textured, night view scene + light profiles, arm solver rewritten (humerus-root chain, elbow hint by hand position, collarbone shrug, chain stretch, continuous wrist roll both sides, relaxed pose when untracked) verified by harness + live two-client run; deployed.'
 - date: '2026-09-04'
@@ -22,5 +24,3 @@ session_history:
   summary: Fixed white seat-marker blobs (always-on bed/tub sprites -> 3.5 m proximity reveal for all seats) and moved all six bed seats onto ray-cast mattress surfaces (NE pair was inside the wardrobe); rebuilt model + client, committed.
 - date: '2026-09-04'
   summary: Fixed stuck teleport arc (masked stopTeleport falling edge -> level-triggered bindings in teleporting sets), thumb-touch-gated movement/snap-turn against stick drift, generic 3-pass coplanar wall dedupe (362 faces), all window views re-derived at 2K+ (Central Park 2560) with mipmaps; rebuilt, committed, deployed.
-- date: '2026-08-31'
-  summary: 'Removed the west-wall picture frame that overlapped the TV panel (24 faces), redeployed and checksum-verified; audited Sat session: servers clean, one guest stuck in a 30s ICE-restart loop all night (needs TURN).'

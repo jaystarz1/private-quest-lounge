@@ -17,6 +17,13 @@ HORIZON_ROW = int(round((13.0 - 3.5) / 17.0 * H))
 QUAD = W // 4
 FEATHER = 182              # 8 degrees each side of every seam
 ORDER = ["north", "east", "south", "west"]
+# Per-photo fixes. The dusk (and derived night) north photo is a different
+# vantage from the day one: it looks over the lit city with Central Park at its
+# right edge, so at night the park sat 45 degrees right of where the day photo
+# puts it. Flip it so the park is on the left, then nudge right so the park
+# lines up with the day pano (fill on the left is the image's own edge,
+# mirrored, which lands in the north-west corner feather).
+ADJUST = {("dusk", "north"): {"flip": True, "shift": 0.09}, ("night", "north"): {"flip": True, "shift": 0.09}}
 
 files = {}
 for fn in os.listdir(src_dir):
@@ -38,6 +45,14 @@ for scene, byDir in sorted(files.items()):
         h = int(round(span * h0 / w0))
         im = im.resize((span, h), Image.LANCZOS)
         arr = np.asarray(im, np.float64)
+        adj = ADJUST.get((scene, d))
+        if adj:
+            if adj.get("flip"):
+                arr = arr[:, ::-1]
+            k = int(round(adj.get("shift", 0.0) * span))
+            if k > 0:
+                arr = np.concatenate([arr[:, :k][:, ::-1], arr[:, :span - k]], axis=1)
+            print(f"{scene}/{d}: adjusted flip={adj.get('flip', False)} shift={k}px")
         top = HORIZON_ROW - int(round(anchor * h))
         # Full-height strip: image rows in place; above the photo, blend its
         # mean sky colour up to a deeper zenith tone (clamping edge rows made

@@ -54,7 +54,7 @@ const LIGHTS = {
 
 json.extensionsUsed = [...new Set([...(json.extensionsUsed || []), "MOZ_hubs_components"])];
 json.extensions = { ...(json.extensions || {}), MOZ_hubs_components: { version: 4 } };
-const counts = { nav: 0, spawn: 0, seat: 0, light: 0, ambient: 0 };
+const counts = { nav: 0, spawn: 0, seat: 0, light: 0, ambient: 0, mirror: 0 };
 for (const node of json.nodes || []) {
   const n = node.name || "";
   let comps = null;
@@ -75,6 +75,12 @@ for (const node of json.nodes || []) {
     const eyeHeight = /^Seat_HotTub_/.test(n) ? 0.70 : 0.60;
     comps = seatWaypoint(n.toLowerCase().replace(/_/g, "-"), eyeHeight);
     counts.seat++;
+  } else if (/^Mirror_/.test(n)) {
+    // Real reflecting mirror (client Reflector, renders the scene again from
+    // the mirrored camera, so keep to one per room). The node's scale is the
+    // mirror's width and height; it faces the node's +Z.
+    comps = { mirror: { color: "#a8adb2" } };
+    counts.mirror++;
   } else if (n === "AmbientLight") {
     comps = { "ambient-light": { color: "#ffe8d2", intensity: 0.6 } };
     counts.ambient++;
@@ -84,9 +90,9 @@ for (const node of json.nodes || []) {
   }
   if (comps) node.extensions = { ...(node.extensions || {}), MOZ_hubs_components: comps };
 }
-const tagged = counts.nav + counts.spawn + counts.seat + counts.light + counts.ambient;
+const tagged = counts.nav + counts.spawn + counts.seat + counts.light + counts.ambient + counts.mirror;
 console.log("tag counts:", JSON.stringify(counts));
-if (counts.nav !== 1 || counts.spawn !== 2 || counts.seat < 40 || counts.light !== 4 || counts.ambient !== 1) {
+if (counts.nav !== 1 || counts.spawn !== 2 || counts.seat < 40 || counts.light !== 4 || counts.ambient !== 1 || counts.mirror !== 1) {
   throw new Error(`unexpected tag counts: ${JSON.stringify(counts)}`);
 }
 // The unusable source piano (Object_108) must stay deleted; the procedural

@@ -47,7 +47,13 @@ for (const [name, L] of Object.entries(POSES)) {
   const l = m.Left;
   console.log(`${name.padEnd(10)} L: upper ${l.upperLen}/${l.upperBind} clav ${l.clavLen}/${l.clavBind} armHeadShift ${l.armHeadShift} wristGap ${l.wristGap} elbow ${l.elbowAngleDeg}deg elbowPos ${JSON.stringify(l.elbow)} stretch worst ${l.worstStretch} mean ${l.meanStretch}`);
 }
-// wrist roll sweep at the forward pose: forearm twist continuity
+// wrist roll sweep at the forward pose: forearm twist continuity. Tracking was
+// just re-enabled, so let the blend-in finish before measuring.
+{
+  const L = [[0.18, 0.45, 0.50], [0, 0, 1], [-1, 0, 0]];
+  await page.evaluate(([l, r]) => window.__setHands(l, r), [L, mirror(L)]);
+  await page.evaluate(() => window.__solveN(60));
+}
 const twist = [];
 for (let deg = 0; deg <= 360; deg += 30) {
   const a = deg * Math.PI / 180;

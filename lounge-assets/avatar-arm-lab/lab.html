@@ -64,6 +64,7 @@ const comp = Object.assign(Object.create(window.__armIkDef), { el: { object3D: r
 window.__setTracked = (l, r) => { tracked.leftController.object3D.visible = l; tracked.rightController.object3D.visible = r; };
 window.__solveN = n => { for (let i = 0; i < n; i++) comp.tock(i * 16, 16); root.updateWorldMatrix(true, true); draw(); return window.__metrics(); };
 comp.init();
+window.__comp = comp; window.__root = root;
 const cams = { front: [0, 0.45, 2.6, 0], side: [2.6, 0.45, 0, 0], top: [0, 3.0, 0.001, 1] };
 const cam = new THREE.OrthographicCamera(-0.75, 0.75, 1.0, -1.0, 0.1, 10);
 function draw() {
