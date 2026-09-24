@@ -6,11 +6,20 @@ against a set of hand poses (hanging, lap, reach, overhead, cross-body, face, T,
 behind, out of reach, wave, wrist-roll sweep, untracked), renders front/side/top
 views and reports bone lengths, wrist gap, elbow placement and skin edge stretch.
 
-Run (from this folder):
+The current automated gate loads the production component and both full-body
+GLBs directly, including body yaw, chest rotation and actual render order:
+
+```sh
+cd ../../services/hubs
+node --test scripts/avatar-arm-ik-frame.test.js
+```
+
+For rendered pose/path inspection, run the browser harness from this folder.
+It imports the copied component as an ES module:
 
 ```sh
 ln -sfn ../node_modules/three three            # three r170 from lounge-assets
-cp ../avatars/avatar-jay-real.glb ../avatars/avatar-her-real.glb .
+cp ../../services/hubs/src/assets/models/lounge-avatars/avatar-jay-real.glb ../../services/hubs/src/assets/models/lounge-avatars/avatar-her-real.glb .
 cp ../../services/hubs/src/components/avatar-arm-ik.js arm-ik-current.js
 python3 -m http.server 8765 --bind 127.0.0.1 &
 node run.mjs avatar-jay-real.glb arm-ik-current.js cur   # needs playwright resolvable from here

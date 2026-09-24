@@ -55,10 +55,17 @@ bind mounts).
   Change the PIN with `LOUNGE_PIN=<pin> bin/up-public` (rebuild takes ~1 min).
 - **Runs on:** the operator's Mac via Cloudflare Tunnel `quest-lounge`
   (`cloudflared-lounge.yml`); voice media flows directly over UDP/TCP
-  40000-40015, held open by UPnP mappings that `bin/up-public` re-asserts.
+  40000-40031. Coturn uses TCP/UDP 3478 and UDP 40032-40063. UPnP is
+  best-effort; unavailable mappings require manual router forwarding.
 - **Email:** magic links delivered by the operator's own Gmail via Apps Script
   webhook (`GMAIL_WEBHOOK_URL`), falling back to Resend SMTP, then log-only.
 - `bin/up-public` starts everything: stack, tunnel, port mappings, caffeinate.
+
+Current penthouse controls, TV pairing, day/night alignment, network setup and
+hardware acceptance checks: [Penthouse controls](guides/penthouse-controls.md).
+The current room uses the personal full-body MetaPerson avatars, estimated
+leg posture and opt-in interactions. Older foundation descriptions below are
+historical and do not describe the current penthouse asset set.
 
 ## What's different from stock Hubs
 

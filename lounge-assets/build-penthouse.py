@@ -5,7 +5,7 @@
 # backdrop). MOZ_hubs_components are injected afterwards by inject-hubs.mjs.
 #
 # Usage: blender -b --factory-startup -P build-penthouse.py -- <src.glb> <out.glb> <bake/day-pano.jpg>
-import bpy, bmesh, sys, math
+import bpy, bmesh, sys, math, os
 from mathutils import Vector
 
 src, out, viewimg = sys.argv[-3], sys.argv[-2], sys.argv[-1]
@@ -700,6 +700,15 @@ def texmat_from(src_name, new_name, rough=0.7, metal=0.0):
     b.inputs['Metallic'].default_value = metal
     return m
 
+def artmat(file_name, new_name, rough=0.9):
+    """Textured material from a tile in art/ (make-furniture-textures.py)."""
+    m = mk(new_name, "FFFFFF", rough)
+    nt = m.node_tree
+    t = nt.nodes.new('ShaderNodeTexImage')
+    t.image = bpy.data.images.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'art', file_name))
+    nt.links.new(t.outputs['Color'], nt.nodes['Principled BSDF'].inputs['Base Color'])
+    return m
+
 def retex_region(x1, x2, y1, y2, z1, z2, mat, label, only_mats=None, only_objects=None, normal=None, scale=1.0, rot=0.0):
     """Give faces inside the box an existing textured material with planar UVs
     in world metres (the model's own maps tile once per metre), so a flat
@@ -885,28 +894,13 @@ region_delete_mats_touch(-3.6, -1.33, -9.9, -6.3, 0.03, 3.05,
                          {'fake_mat_251_251_251_255', 'fake_mat_196_192_184_255',
                           'fake_mat_69_64_65_255', 'fake_mat_230_220_187_255'}, "lobby-canopy")
 region_delete_mats(-3.6, -1.33, -9.9, -6.3, 1.90, 3.05, {'beige_006_Wall_Entity_Material'}, "lobby-canopy-green")
-# West wall with a doorway to the SW terrace.
-add_box("LobbyWallW1", -7.62, -7.435, 1.475, 0.03, 0.815, 1.475, M_WALL)
-add_box("LobbyWallW2", -7.62, -9.505, 1.475, 0.03, 0.255, 1.475, M_WALL)
-add_box("LobbyWallWHead", -7.62, -8.775, 2.775, 0.03, 0.475, 0.175, M_WALL)
-# Baseboards on the long walls.
-add_box("LobbyBaseN", -3.135, -6.605, 0.10, 1.815, 0.012, 0.06, M_DARK)
-add_box("LobbyBaseS", -4.47, -9.695, 0.10, 3.15, 0.012, 0.06, M_DARK)
-# Elevator bank: two brass-framed cars with steel leaves + glow slits.
-for i, ex in enumerate((-6.1, -3.9)):
-    add_box(f"LiftFrame{i}", ex, -9.705, 1.18, 0.75, 0.022, 1.18, M_BRASS)
-    add_box(f"LiftRecess{i}", ex, -9.72, 1.10, 0.62, 0.015, 1.10, M_DARK)
-    add_box(f"LiftLeafL{i}", ex - 0.30, -9.70, 1.08, 0.285, 0.014, 1.08, M_STEEL)
-    add_box(f"LiftLeafR{i}", ex + 0.30, -9.70, 1.08, 0.285, 0.014, 1.08, M_STEEL)
-    add_box(f"LiftHall{i}", ex, -9.695, 2.46, 0.30, 0.014, 0.045, M_GLOW)
-add_box("LiftCall", -5.0, -9.71, 1.08, 0.045, 0.014, 0.09, M_BRASS)
-add_box("LiftCallDot", -5.0, -9.695, 1.08, 0.018, 0.012, 0.018, M_GLOW)
-# Runner on the stone. (The former console/mirror rendered as a black slab in
-# the headset and crowded the gallery wall; the art now hangs at eye level.)
-add_box("LobbyRug", -4.47, -8.19, 0.048, 2.60, 0.55, 0.008, M_WINE)
-# Potted plants in the lobby corners.
-plant("LobbyPlantW", -7.05, -9.3, 0.04, 1.2, 0.4)
-plant("LobbyPlantE", -1.75, -9.3, 0.04, 1.2, 2.1)
+# The former elevator lobby is now the covered half of the beach-club spa.
+# Its west wall and short north return are deliberately absent: the entire
+# deck, former pocket and lounge join without a door-sized bottleneck.
+for nm in ("LobbyWallN1", "LobbyDoorHead"):
+    bpy.data.objects.remove(bpy.data.objects[nm], do_unlink=True)
+add_box("LobbyBaseN", -3.135, -6.605, 0.16, 1.815, 0.012, 0.06, M_DARK)
+add_box("LobbyBaseS", -4.47, -9.695, 0.16, 3.15, 0.012, 0.06, M_DARK)
 
 # --- SW terrace: accessible four-person hot tub ------------------------------
 add_box("DeckSW", -9.57, -7.48, 0.07, 1.85, 2.28, 0.03, M_DECK)   # y -9.76..-5.20; the sill band continues to the wall
@@ -950,8 +944,8 @@ for i, (dx, dy, rr) in enumerate(((-0.42, 0.18, 0.035), (-0.12, -0.31, 0.025),
     bpy.context.active_object.data.materials.append(M_TUB)
 # (The first build stood these two INSIDE the wall cavity at y -4.75, where
 # they showed through the piano-room niche instead of on the deck.)
-plant("TerrSWplant1", -6.95, -5.60, 0.04, 1.5, 0.8)
-plant("TerrSWplant2", -6.05, -5.55, 0.04, 1.5, 2.6)
+plant("TerrSWplant1", -5.90, -5.60, 0.10, 1.0, 0.8)
+
 for i, (bx, by) in enumerate(((-11.15, -9.45), (-7.95, -9.45), (-7.58, -6.42))):
     add_box(f"BollSW{i}", bx, by, 0.32, 0.045, 0.045, 0.32, M_RAIL)
     add_box(f"BollSWg{i}", bx, by, 0.60, 0.05, 0.05, 0.028, M_GLOW)
@@ -1002,11 +996,20 @@ cushB = mk('CushRust', 'B0562F', 0.9)
 add_box("DenCush1", 0.25, -7.95, DEN_Z + 0.07, 0.28, 0.28, 0.055, cushA)
 add_box("DenCush2", 2.55, -7.95, DEN_Z + 0.07, 0.28, 0.28, 0.055, cushB)
 add_box("DenGlow", 1.5, -8.45, 6.20, 0.55, 0.22, 0.014, M_GLOW)
-# Green on the flanking roof ledges, seen through the den's glass walls.
-# The corridor from the gym runs down the den's west glass to its door at
-# (-0.75, -8.05); keep the west plant south of that approach.
-plant("LedgeW2", -1.45, -9.45, DEN_Z, 1.2, 1.7)
-plant("LedgeE1", 4.2, -8.5, DEN_Z, 1.4, 2.9)
+# (The west ledge plant sat inside what is now the sauna; the finish pass
+# rebuilds that room.)
+# Move the east ledge plant into the room and replace the source planter's
+# clipped wall/pot fragments with a complete freestanding ceramic vessel.
+denplant=plant("LedgeE1", 3.40, -9.36, DEN_Z + .02, .7, 2.9)
+denplant.data=denplant.data.copy()
+bp=bmesh.new(); bp.from_mesh(denplant.data)
+remove=[f for f in bp.faces if not denplant.data.materials[f.material_index].name.startswith('Foliage_') or f.calc_center_median().z < .82]
+bmesh.ops.delete(bp,geom=remove,context='FACES');bp.to_mesh(denplant.data);bp.free()
+M_DEN_POT=mk('DenIvoryPlanter','DCD3BE',.72)
+bpy.ops.mesh.primitive_cone_add(vertices=32,radius1=.14,radius2=.16,depth=.56,location=(3.40,-9.36,DEN_Z+.30))
+bpy.context.object.name='DenPlanterPot';bpy.context.object.data.materials.append(M_DEN_POT)
+bpy.ops.mesh.primitive_cylinder_add(vertices=32,radius=.15,depth=.012,location=(3.40,-9.36,DEN_Z+.586))
+bpy.context.object.name='DenPlanterSoil';bpy.context.object.data.materials.append(mk('DenPlanterSoil','332C25',1.0))
 
 # ===================== FURNITURE: LIBRARY CHAIRS + GRAND PIANO ================
 # Library: the "reading group" seats sat inside the bookshelves — the room has
@@ -1478,9 +1481,218 @@ join_objects("PatioFrame", ("PatioPane", "PatioLeaf", "PatioTrack", "PatioHandle
 join_objects("PatioStone", ("PatioJamb", "PatioHead", "PatioSill"))
 join_objects("TerraceGlowSW", ("SoffitLightSW", "SconceSW"))
 
+# --- Patio sectional: woven cushion fabric and dark resin wicker frame -------
+# Flat ivory on flat charcoal read as one blob against the grey patio tiles.
+# Scoped to the sectional's box so the shared linen/frame materials elsewhere
+# (curtains, bedding, the piano-room door frame) are untouched.
+PATIO_SOFA = (-4.3, -0.6, 4.9, 8.6, 0.05, 1.2)
+M_PATIO_FABRIC = artmat('fabric-oatmeal.png', 'PatioCushionCanvas', 0.95)
+M_PATIO_WICKER = artmat('wicker-espresso.png', 'PatioResinWicker', 0.7)
+retex_region(*PATIO_SOFA, M_PATIO_FABRIC, "PatioSofaCushions", only_objects=("Object_54",),
+             only_mats={"fake_mat_224_230_228_255"}, scale=0.25)
+retex_region(*PATIO_SOFA, M_PATIO_WICKER, "PatioSofaFrame", only_objects=("Object_67",),
+             only_mats={"fake_mat_69_64_65_255"}, scale=0.3)
+
+# --- Capri beach club: open spa and conversation lounge ---------------------
+exec(compile(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "build-spa.py")).read(), "build-spa.py", "exec"))
+
+# --- Parisian coffee terrace: an architectural shopfront, not a scenery card.
+# This is the kitchen's SOUTH wall. Keep the working base counter; remove
+# backsplash, upper cupboards and all exterior wall sheets through the hatch.
+cut_opening(8.12, 10.78, -4.52, -3.03, 1.12, 2.62, "cafe-serving-window")
+M_CAFE_GREEN = mk("CafeBottleGreen", "183D32", .62)
+M_CAFE_CREAM = mk("CafeCanvas", "E9DDC2", .95)
+M_CAFE_BRASS = mk("CafeAgedBrass", "A8894F", .4, .65)
+M_CAFE_STONE = texmat_from('20210309-221754-cet_Wall_Entity_Material', 'CafeLimestone', .88)
+M_CAFE_GROUT = mk("CafeGrout", "888275", .95)
+M_CAFE_RATTAN = mk("CafeRattan", "AA8152", .85)
+
+# Replace the over-sized source planters and block-chair bases, retaining the
+# two seat anchors and a clear 1.2 m approach from the covered walk.
+for nm in ("TerrSEplant1", "TerrSEplant2", "TerrSEplant3", "BistroPlinth0", "BistroPlinth1",
+           "BistroBack0", "BistroBack1"):
+    ob = bpy.data.objects.get(nm)
+    if ob:
+        bpy.data.objects.remove(ob, do_unlink=True)
+for nm in ("DeckSE", "DeckWalk"):
+    ob = bpy.data.objects[nm]
+    ob.location.z -= .015  # bedding below the flags, never coplanar with them
+    ob.data.materials.clear()
+    ob.data.materials.append(M_CAFE_GROUT)
+    for f in ob.data.polygons:
+        f.material_index = 0
+# Flush limestone flags with staggered joints continue to the existing lobby.
+# Their highest point stays at .10, identical to the previous deck/nav level.
+for row in range(9):
+    y0, y1 = -9.72 + row * .59, min(-4.42, -9.72 + (row + 1) * .59)
+    left = 2.58 if y1 <= -6.35 else 6.12
+    x = left - (.45 if row % 2 else 0)
+    col = 0
+    while x < 11.36:
+        lo, hi = max(left, x), min(11.36, x + .9)
+        if hi - lo > .03:
+            tex_box(f"CafePaving_{row}_{col}", (lo+hi)/2, (y0+y1)/2, .093,
+                    (hi-lo)/2-.005, (y1-y0)/2-.005, .007, M_CAFE_STONE, scale=.65)
+        x += .9
+        col += 1
+# Shopfront piers, low panels and continuous cornice share one datum; the
+# limestone reveals line the full wall cavity rather than exposing cut edges.
+# The west return is x=6.086, not the old deck edge x=7.0. Wrap the
+# stone around that actual wall and fill the previously bare floor strip.
+tex_box("CafeStoneReturn",6.115,-5.42,1.61,.025,.98,1.51,M_CAFE_STONE,scale=.7)
+tex_box("CafeStoneReturnCornice",6.15,-5.42,3.235,.07,.98,.035,M_CAFE_STONE)
+add_box("CafeJoineryReturnFrieze",6.145,-5.42,3.02,.025,.98,.19,M_CAFE_GREEN)
+for i, (x, hx) in enumerate(((6.30,.20),(7.94,.18),(11.02,.24))):
+    tex_box(f"CafeStonePier{i}", x,-4.49,1.45,hx,.06,1.35,M_CAFE_STONE,scale=.7)
+for x in (8.10,10.80):
+    add_box("CafeJoineryJamb",x,-4.53,1.83,.055,.075,.79,M_CAFE_GREEN)
+    tex_box("CafeStoneReveal",x,-3.80,1.87,.025,.72,.75,M_CAFE_STONE)
+tex_box("CafeStoneLintelReveal",9.45,-3.80,2.62,1.36,.72,.025,M_CAFE_STONE)
+tex_box("CafeStoneServingCounter",9.45,-4.47,1.10,1.31,.29,.04,M_MARB)
+add_box("CafeJoineryLower",9.45,-4.51,.57,1.35,.06,.47,M_CAFE_GREEN)
+for x in (8.57,9.45,10.33):
+    for z in (.20,.93):
+        add_box("CafeBrassPanelRail",x,-4.577,z,.37,.009,.009,M_CAFE_BRASS)
+    for xx in (x-.37,x+.37):
+        add_box("CafeBrassPanelStile",xx,-4.577,.565,.009,.009,.365,M_CAFE_BRASS)
+add_box("CafeJoineryFascia",8.71,-4.53,3.02,2.61,.085,.19,M_CAFE_GREEN)
+tex_box("CafeStoneCornice",8.71,-4.53,3.235,2.67,.14,.035,M_CAFE_STONE)
+for x,hx in ((6.30,.20),(9.54,1.83)):
+    tex_box("CafeStonePlinth",x,-4.53,.17,hx,.10,.07,M_CAFE_STONE)
+# A striped retractable-style canopy is attached below the cornice, with no
+# posts in the circulation path. Modest depth preserves the skyline outlook.
+for i in range(20):
+    x=6.10+(i+.5)*.261
+    add_box("CafeCanvasCanopy",x,-5.05,2.72,.1305,.62,.014,
+            M_CAFE_CREAM if i%2 == 0 else M_CAFE_GREEN)
+    bpy.context.object.rotation_euler.x=math.radians(12)
+    add_box("CafeCanvasValance",x,-5.65,2.52,.1305,.018,.075,
+            M_CAFE_CREAM if i%2 == 0 else M_CAFE_GREEN)
+
+def cafe_text(name, body, pos, size, material):
+    bpy.ops.object.text_add(location=pos, rotation=(math.pi/2,0,0))
+    ob=bpy.context.object
+    ob.name=name
+    ob.data.body=body
+    ob.data.align_x='CENTER'
+    ob.data.size=size
+    ob.data.extrude=.001
+    ob.data.materials.append(material)
+    bpy.ops.object.convert(target='MESH')
+cafe_text("CafeLetteringName", "CAFÉ DU PARC", (8.71,-4.624,2.97), .19, M_CAFE_CREAM)
+# A real open door beside the hatch, through every wall/cabinet layer.
+# The leaf is parked outward against the west jamb, clear of the 1.1 m route.
+cut_opening(6.52, 7.72, -4.62, -2.70, .105, 2.66, "cafe-outside-door")
+for x in (6.49,7.75):
+    tex_box("CafeStoneDoorReveal",x,-3.69,1.38,.03,.93,1.28,M_CAFE_STONE)
+    add_box("CafeJoineryDoorJamb",x,-4.57,1.38,.045,.045,1.28,M_CAFE_GREEN)
+tex_box("CafeStoneDoorHead",7.12,-3.69,2.68,.66,.93,.025,M_CAFE_STONE)
+tex_box("CafeStoneDoorThreshold",7.12,-3.69,.077,.60,.93,.023,M_CAFE_STONE)
+# Glazed leaf, opened ninety degrees; slim brass pull on its free end.
+for y in (-4.59,-5.59):
+    add_box("CafeJoineryDoorLeafStile",6.44,y,1.34,.035,.04,1.23,M_CAFE_GREEN)
+for z in (.15,.70,2.53):
+    add_box("CafeJoineryDoorLeafRail",6.44,-5.09,z,.035,.54,.04,M_CAFE_GREEN)
+add_box("CafeJoineryDoorLeafLower",6.44,-5.09,.43,.026,.50,.24,M_CAFE_GREEN)
+if M_GLASSP:
+    add_box("CafeDoorGlass",6.44,-5.09,1.62,.008,.49,.87,M_GLASSP)
+add_box("CafeBrassDoorPull",6.38,-5.43,1.10,.03,.015,.14,M_CAFE_BRASS)
+# Finish the covered-walk wall and cut interior surfaces as continuous plaster.
+M_CAFE_PLASTER = mk("CafeWarmPlaster", "E9DDC8", .94)
+retex_region(2.55,6.14,-6.45,-6.1,.11,3.23,M_CAFE_PLASTER,"CafeWalkPlaster",only_mats=WALLMATS,normal=(0,-1,0))
+retex_region(6.1,11.35,-4.55,-2.95,1.15,3.23,M_CAFE_PLASTER,"CafeKitchenPlaster",only_mats=WALLMATS)
+for x in (7.95,11.02):
+    add_box("CafeBrassLanternMount",x,-4.58,2.32,.06,.025,.12,M_CAFE_BRASS)
+    add_box("CafeJoineryLanternCap",x,-4.72,2.45,.09,.10,.025,M_CAFE_GREEN)
+    add_box("CafeGlowLantern",x,-4.72,2.30,.06,.065,.12,M_GLOW)
+    add_box("CafeJoineryLanternBase",x,-4.72,2.16,.09,.09,.025,M_CAFE_GREEN)
+# Slim café chairs: keep the proven seat position and height exactly intact.
+for i,(cy,backy) in enumerate(((-6.55,-6.28),(-8.05,-8.32))):
+    ob=bpy.data.objects[f"BistroSeat{i}"]
+    ob.data.materials.clear()
+    ob.data.materials.append(M_CAFE_RATTAN)
+    for dx in (-.18,.18):
+        for dy in (-.17,.17):
+            add_box("CafeJoineryChairLeg",9.5+dx,cy+dy,.275,.018,.018,.175,M_CAFE_GREEN)
+        add_box("CafeJoineryChairBackPost",9.5+dx,backy,.70,.018,.018,.25,M_CAFE_GREEN)
+    for z in (.68,.76,.84,.92):
+        add_box("CafeRattanChairBack",9.5,backy,z,.20,.018,.023,M_CAFE_RATTAN)
+retex_region(9,10,-8,-6,0,1,M_MARB,"cafe-marble-table",only_objects=("BistroTop",),scale=1)
+# Draped square gingham linen over the round bistro table, with a soft hem.
+import os
+M_GINGHAM = mk("CafeGingham", "FFFFFF", .95)
+nt = M_GINGHAM.node_tree
+tex = nt.nodes.new('ShaderNodeTexImage')
+tex.image = bpy.data.images.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'art', 'gingham.png'))
+nt.links.new(tex.outputs['Color'], nt.nodes['Principled BSDF'].inputs['Base Color'])
+vs, fs, uvcoords = [], [], []
+N=40
+for j in range(N+1):
+    for i in range(N+1):
+        u,v=(i/N-.5)*.96,(j/N-.5)*.96
+        r=math.hypot(u,v)
+        a=math.atan2(v,u)
+        over=max(0,r-.386)
+        rr=min(r,.386)+over*.17
+        z=.819-over*.93 + (math.sin(a*16)*.008*min(1,over/.05) if over else 0)
+        vs.append((9.5+rr*math.cos(a),-7.3+rr*math.sin(a),z))
+        uvcoords.append((i/N,j/N))
+for j in range(N):
+    for i in range(N):
+        k=j*(N+1)+i
+        fs.append((k,k+1,k+N+2,k+N+1))
+me=bpy.data.meshes.new('CafeTablecloth'); me.from_pydata(vs,[],fs); me.materials.append(M_GINGHAM)
+uv=me.uv_layers.new()
+for f in me.polygons:
+    f.use_smooth=True
+    for loop in f.loop_indices: uv.data[loop].uv=uvcoords[me.loops[loop].vertex_index]
+o=bpy.data.objects.new('CafeTablecloth',me); sc.collection.objects.link(o)
+# Small glazed ivory bud vase with five dimensional roses and green stems.
+M_VASE=mk('CafeIvoryCeramic','EEE6D4',.24)
+M_ROSE=mk('CafeRosePetal','A62943',.72)
+M_ROSE_LIGHT=mk('CafeRosePetalLight','D45E70',.78)
+M_STEM=mk('CafeRoseGreen','36543A',.85)
+profile=[(.0,.052),(.02,.074),(.11,.065),(.17,.033),(.205,.036),(.21,.028),(.18,.026)]
+vv=[]; ff=[]
+for z,r in profile:
+    for i in range(24):
+        a=i*math.tau/24; vv.append((9.5+r*math.cos(a),-7.3+r*math.sin(a),.824+z))
+for j in range(len(profile)-1):
+    for i in range(24):
+        k=j*24+i; ff.append((k,j*24+(i+1)%24,(j+1)*24+(i+1)%24,k+24))
+me=bpy.data.meshes.new('CafeRoseVase'); me.from_pydata(vv,[],ff); me.materials.append(M_VASE)
+o=bpy.data.objects.new('CafeRoseVase',me); sc.collection.objects.link(o)
+for f in me.polygons:f.use_smooth=True
+for n,(dx,dy,z) in enumerate(((0,0,1.24),(.07,.025,1.19),(-.065,.025,1.20),(.018,-.07,1.17),(-.03,.075,1.16))):
+    base=Vector((9.5,-7.3,1.00)); tip=Vector((9.5+dx,-7.3+dy,z))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=8,radius=.003,depth=(tip-base).length,location=(tip+base)/2)
+    ob=bpy.context.object; ob.name='CafeRoseStem'; ob.rotation_euler=(tip-base).to_track_quat('Z','Y').to_euler(); ob.data.materials.append(M_STEM)
+    for ring in range(3):
+        count=5 if ring else 3
+        for k in range(count):
+            angle=math.tau*k/count+ring*.65+n
+            radius=.010+ring*.010
+            bpy.ops.mesh.primitive_uv_sphere_add(segments=8,ring_count=4,radius=1,location=(tip.x+radius*math.cos(angle),tip.y+radius*math.sin(angle),z+.02-ring*.011))
+            ob=bpy.context.object; ob.name='CafeRosePetal'; ob.scale=(.022,.010,.024); ob.rotation_euler=(.2,ring*.3,angle+math.pi/2); ob.data.materials.append(M_ROSE_LIGHT if ring==2 else M_ROSE)
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=8,ring_count=4,radius=1,location=(tip.x+.025,tip.y,z-.11))
+    ob=bpy.context.object; ob.name='CafeRoseLeaf'; ob.scale=(.038,.014,.005); ob.rotation_euler.y=-.45; ob.data.materials.append(M_STEM)
+join_objects('CafeRoseBouquet',('CafeRosePetal','CafeRoseStem','CafeRoseLeaf'))
+
+# Low planting defines the frontage without blocking the hatch or chairs.
+for x in (10.95,):
+    tex_box("CafeStonePlanter",x,-4.98,.32,.24,.24,.22,M_CAFE_STONE)
+    plant("CafePlant",x,-4.98,.46,.42,.5)
+join_objects("CafeStonework", ("CafeStone", "CafePaving"))
+join_objects("CafeJoinery", ("CafeJoinery",))
+join_objects("CafeMetalwork", ("CafeBrass",))
+join_objects("CafeAwning", ("CafeCanvas",))
+join_objects("CafeLettering", ("CafeLettering",))
+join_objects("CafeChairWeave", ("CafeRattan",))
+join_objects("CafeLanternGlow", ("CafeGlow",))
+
 # --- Gym: the global palette spilled navy, teal and espresso into this room.
 # Warm white walls, mirror panels, herringbone floor.
-GYM = (-4.65, -0.95, -6.85, -4.35)
+GYM = (-4.65, -0.95, -6.85, -1.70)  # room continues to the north wall at y=-1.80
 recolor_region(*GYM, 3.45, 6.35, "E6DFD3", rough=0.9, label="GymWall",
                only_mats={'blanc_001_Wall_Entity_Material', 'beige_006_Wall_Entity_Material',
                           'enduit_004_Wall_Entity_Material', 'gris_002_Wall_Entity_Material', 'FacadeSW'})
@@ -1541,6 +1753,126 @@ recolor_region(-11.4, -7.2, -2.0, -1.5, 3.45, 6.45, "F0ECE6", rough=0.85, label=
                only_mats={'fake_mat_35_32_34_255', 'beige_006_Wall_Entity_Material'}, normal=(0, 1, 0), min_area=0.15)
 retex_region(*EN, 3.45, 3.62, M_MARB, "EnsuiteFloor", only_mats={'fake_mat_6_5_5_255', 'fake_mat_35_32_34_255'}, normal='up')
 
+# --- Sky den: drop the two source tub chairs (Object_56 shells, Object_65
+# pillows) that jammed the room against the sofa. The den is entered from the
+# hall through its north double door (x 0.0..1.45): take the closed glass
+# leaves and their meeting stile out so the doorway reads open.
+for _nm in ("Object_56", "Object_65"):
+    _ob = bpy.data.objects.get(_nm)
+    _bmd = bmesh.new(); _bmd.from_mesh(_ob.data)
+    _doomed = [f for f in _bmd.faces if 1.6 < (_ob.matrix_world @ f.calc_center_median()).x < 3.75
+               and -9.35 < (_ob.matrix_world @ f.calc_center_median()).y < -7.22
+               and 3.45 < (_ob.matrix_world @ f.calc_center_median()).z < 4.35]
+    bmesh.ops.delete(_bmd, geom=_doomed, context='FACES'); _bmd.to_mesh(_ob.data); _bmd.free()
+    print(f"DEN CHAIRS {_nm}: -{len(_doomed)} faces")
+region_delete_mats(0.02, 1.43, -7.30, -7.05, 3.52, 5.80, {GLASS_MAT}, "den-door-panes")
+region_delete_mats(0.55, 0.85, -7.30, -7.05, 3.52, 5.60, {'fake_mat_35_32_34_255'}, "den-door-stile")
+cut_opening(0.70, 0.80, -7.25, -7.10, 3.52, 5.60, "den-door-mullion")   # the stile's DenWalls-recoloured core
+
+# --- Sauna: the tiered-bench room west of the den (x -3.0..-0.70, y -9.68..
+# -6.70, floor 3.50, ceiling 6.27) was only reachable through the den's glass
+# west door. Seal that side, open a doorway from the gym through the mirrored
+# south wall, strip the source benches and line the room in cedar.
+M_CEDAR = artmat('sauna-cedar.png', 'SaunaCedar', 0.78)
+M_STOVE = mk('SaunaStove', '2B2A28', 0.5, 0.4)
+M_STONE_S = mk('SaunaStone', '6E6A64', 0.95)
+M_EMBER = mk('SaunaEmber', '3A1A08', 0.6)
+_eb = M_EMBER.node_tree.nodes['Principled BSDF']
+if _eb.inputs.get('Emission Color'):
+    _eb.inputs['Emission Color'].default_value = (1.0, 0.38, 0.08, 1)
+    _eb.inputs['Emission Strength'].default_value = 2.2
+M_DENPLASTER = mk('DenEndWall', 'E9E2D6', 0.9)
+region_delete_mats(-3.4, -0.6, -9.9, -6.3, 3.4, 4.5, {'fake_mat_170_128_59_255'}, "sauna-source-benches")
+# Everything else of the source inside the room volume (its own white lining
+# panels, a shelf ledge, the den door's frame, glass and handles) sat in
+# front of the new cedar and showed as white strips and grey brackets. Wall
+# faces lie on their planes, outside these inset boxes, and survive; large
+# decimated faces that reach in are bisected at the box and trimmed.
+cut_opening(-2.986, -0.60, -9.665, -7.305, 3.53, 6.262, "sauna-volume")
+cut_opening(-2.986, -1.815, -7.305, -6.715, 3.53, 6.262, "sauna-alcove-volume")
+SD_X1, SD_X2, SD_Z = -2.58, -1.92, 5.55          # gym -> sauna doorway
+cut_opening(SD_X1, SD_X2, -6.85, -6.20, 3.52, SD_Z, "sauna-door")
+# Floor: cedar duckboard over the main room, the entry alcove and the sill.
+tex_box("SaunaFloor", -1.85, -8.48, 3.515, 1.15, 1.20, 0.012, M_CEDAR, scale=0.6)
+tex_box("SaunaFloorAlcove", -2.405, -6.99, 3.515, 0.585, 0.29, 0.012, M_CEDAR, scale=0.6)
+tex_box("SaunaSill", (SD_X1 + SD_X2) / 2, -6.49, 3.51, (SD_X2 - SD_X1) / 2, 0.21, 0.012, M_CEDAR, scale=0.6)
+# Wall and ceiling lining, a few mm proud of the source faces. The east panel
+# closes the den's glass wall; the den gets a plaster face on its side.
+Z_MID, Z_HALF = (3.50 + 6.27) / 2, (6.27 - 3.50) / 2
+tex_box("SaunaLineW", -2.985, -8.19, Z_MID, 0.006, 1.49, Z_HALF, M_CEDAR, rot=0.0)
+tex_box("SaunaLineS", -1.845, -9.674, Z_MID, 1.145, 0.006, Z_HALF, M_CEDAR)
+tex_box("SaunaLineE", -0.695, -8.48, Z_MID, 0.008, 1.20, Z_HALF, M_CEDAR)
+# The north lining fills the 20 cm wall cavity: nav cells centred mid-wall
+# passed the 0.08 m wall probe and walked the hall straight into the sauna.
+tex_box("SaunaLineN", -1.25, -7.198, Z_MID, 0.55, 0.098, Z_HALF, M_CEDAR)
+tex_box("SaunaLineAlcoveE", -1.806, -6.99, Z_MID, 0.005, 0.29, Z_HALF, M_CEDAR)
+tex_box("SaunaLineAlcoveNW", (-2.99 + SD_X1 - 0.06) / 2, -6.705, Z_MID, (SD_X1 - 0.06 + 2.99) / 2, 0.005, Z_HALF, M_CEDAR)
+tex_box("SaunaLineAlcoveNE", (SD_X2 + 0.06 - 1.81) / 2, -6.705, Z_MID, (-1.81 - SD_X2 - 0.06) / 2, 0.005, Z_HALF, M_CEDAR)
+tex_box("SaunaLineAlcoveHead", (SD_X1 + SD_X2) / 2, -6.705, (SD_Z + 6.27) / 2, (SD_X2 - SD_X1) / 2 + 0.06, 0.005, (6.27 - SD_Z) / 2, M_CEDAR)
+tex_box("SaunaCeil", -1.845, -8.48, 6.262, 1.145, 1.20, 0.006, M_CEDAR)
+tex_box("SaunaCeilAlcove", -2.40, -6.99, 6.262, 0.59, 0.29, 0.006, M_CEDAR)
+add_box("DenEndWall", -0.635, -8.49, 4.88, 0.010, 1.23, 1.37, M_DENPLASTER)
+add_box("DenEndBase", -0.618, -8.49, 3.58, 0.008, 1.23, 0.06, M_DARK)
+# Doorway: cedar jambs and head through the wall on both faces; the glass
+# leaf opens outward (as sauna doors do), parked against the gym mirror wall.
+for _nm, _x in (("SaunaJambW", SD_X1 - 0.03), ("SaunaJambE", SD_X2 + 0.03)):
+    tex_box(_nm, _x, -6.49, (3.50 + SD_Z) / 2, 0.03, 0.23, (SD_Z - 3.50) / 2, M_CEDAR, rot=math.pi / 2)
+tex_box("SaunaHead", (SD_X1 + SD_X2) / 2, -6.49, SD_Z + 0.035, (SD_X2 - SD_X1) / 2 + 0.06, 0.23, 0.035, M_CEDAR)
+if M_GLASSP:
+    add_box("SaunaDoorGlass", SD_X1 - 0.36, -6.262, 4.52, 0.30, 0.006, 0.96, M_GLASSP)
+tex_box("SaunaDoorEdge", SD_X1 - 0.68, -6.262, 4.52, 0.02, 0.012, 0.97, M_CEDAR, rot=math.pi / 2)
+tex_box("SaunaDoorHandle", SD_X1 - 0.62, -6.235, 4.50, 0.02, 0.02, 0.16, M_CEDAR, rot=math.pi / 2)
+# Main room x -2.99..-0.70, y -9.68..-7.30. Two-tier L bench on the south and
+# east walls (upper seat 0.92 m, 0.45 m step bench in front), stove by the
+# entry in the north-west corner, open floor between for the walk in.
+tex_box("SaunaBenchUpS", -1.845, -9.38, 3.96, 1.145, 0.30, 0.46, M_CEDAR)
+tex_box("SaunaBenchUpE", -1.00, -8.515, 3.96, 0.30, 0.565, 0.46, M_CEDAR, rot=math.pi / 2)
+tex_box("SaunaBenchLoS", -2.145, -8.83, 3.725, 0.845, 0.25, 0.225, M_CEDAR)
+tex_box("SaunaBenchLoE", -1.55, -8.265, 3.725, 0.25, 0.315, 0.225, M_CEDAR, rot=math.pi / 2)
+# Backrest boards above the upper tier.
+for _i, _z in enumerate((4.72, 4.92)):
+    tex_box(f"SaunaBackS{_i}", -1.845, -9.645, _z, 1.145, 0.025, 0.045, M_CEDAR)
+    tex_box(f"SaunaBackE{_i}", -0.73, -8.515, _z, 0.025, 0.565, 0.045, M_CEDAR, rot=math.pi / 2)
+# Hidden warm LED under the upper bench nose, ceiling light.
+add_box("SaunaGlowBenchS", -2.145, -9.075, 4.36, 0.845, 0.004, 0.012, M_GLOW)
+add_box("SaunaGlowBenchE", -1.305, -8.515, 4.36, 0.004, 0.565, 0.012, M_GLOW)
+add_box("SaunaGlowCeil", -1.85, -8.30, 6.25, 0.35, 0.12, 0.008, M_GLOW)
+# Stove: steel body, ember window facing the room, rock basket, cedar guard
+# on its two open sides.
+STV_X, STV_Y = -2.78, -7.64
+add_box("SaunaStoveBody", STV_X, STV_Y, 3.88, 0.19, 0.19, 0.35, M_STOVE)
+add_box("SaunaStoveEmber", STV_X + 0.195, STV_Y, 3.78, 0.005, 0.09, 0.06, M_EMBER)
+for _i, (_dx, _dy, _r) in enumerate(((-0.08, -0.07, 0.065), (0.07, -0.08, 0.06), (0.0, 0.07, 0.065),
+                                     (-0.08, 0.08, 0.05), (0.08, 0.07, 0.055), (0.0, -0.01, 0.06),
+                                     (-0.04, 0.0, 0.05), (0.05, 0.02, 0.05))):
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=_r, location=(STV_X + _dx, STV_Y + _dy, 4.26 + _r * 0.6))
+    bpy.context.active_object.name = f"SaunaRock{_i}"
+    bpy.context.active_object.data.materials.append(M_STONE_S)
+for _i in range(5):
+    tex_box(f"SaunaGuardE{_i}", -2.52, STV_Y - 0.24 + _i * 0.12, 3.90, 0.012, 0.02, 0.38, M_CEDAR, rot=math.pi / 2)
+    tex_box(f"SaunaGuardS{_i}", -2.96 + _i * 0.105, STV_Y - 0.27, 3.90, 0.02, 0.012, 0.38, M_CEDAR, rot=math.pi / 2)
+# Bucket and ladle on the step bench nearest the stove; towels on the top
+# tier; thermometer on the north wall.
+bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.11, depth=0.17, location=(-2.80, -8.83, 4.035))
+bpy.context.active_object.name = "SaunaBucket"
+bpy.context.active_object.data.materials.append(M_CEDAR)
+for _i, _z in enumerate((3.985, 4.085)):
+    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.113, depth=0.012, location=(-2.80, -8.83, _z))
+    bpy.context.active_object.name = f"SaunaBucketBand{_i}"
+    bpy.context.active_object.data.materials.append(M_DARK)
+add_box("SaunaLadle", -2.67, -8.83, 4.15, 0.13, 0.012, 0.012, M_CEDAR)
+add_box("SaunaTowel1", -2.30, -9.40, 4.44, 0.20, 0.16, 0.025, M_TOWEL)
+add_box("SaunaTowel2", -1.00, -8.30, 4.44, 0.16, 0.20, 0.025, M_TOWEL)
+bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.09, depth=0.02, location=(-1.20, -7.306, 5.05), rotation=(math.pi / 2, 0, 0))
+bpy.context.active_object.name = "SaunaThermo"
+bpy.context.active_object.data.materials.append(M_DARK)
+join_objects("SaunaCedarJoined", ("SaunaLine", "SaunaCeil", "SaunaFloor", "SaunaSill", "SaunaJamb", "SaunaHead",
+                                  "SaunaBench", "SaunaBack", "SaunaGuard", "SaunaDoorEdge", "SaunaDoorHandle",
+                                  "SaunaBucket", "SaunaLadle"))
+join_objects("SaunaGlow", ("SaunaGlow",))
+join_objects("SaunaRocks", ("SaunaRock",))
+join_objects("SaunaTowels", ("SaunaTowel",))
+
 # --- Seats: authored spots, snapped onto the real seat surfaces --------------
 # name, x, y, expected seat-surface z, yaw_deg
 # yaw: avatar facing after glTF export (empty -Y): 0=-y  90=+x  180=+y  -90=-x
@@ -1557,6 +1889,11 @@ SEATS = [
     ("Seat_B3", 10.49, -0.41, 0.76, 0),
     # Lounge ottoman, facing the TV wall
     ("Seat_Ott", -9.40, 4.55, 0.36, -90),
+    # Media sofa directly across from the wall TV (TV centre y 6.8), one spot
+    # per cushion (seams at y ~5.7 and ~6.7), all facing the screen.
+    ("Seat_TV1", -6.65, 5.20, 0.43, -90),
+    ("Seat_TV2", -6.65, 6.20, 0.43, -90),
+    ("Seat_TV3", -6.65, 7.20, 0.43, -90),
     # Formal dining — eight Qing chairs
     ("Seat_D1", 7.98, 4.75, 0.456, 90),
     ("Seat_D2", 7.98, 5.44, 0.456, 90),
@@ -1600,6 +1937,9 @@ SEATS = [
     ("Seat_HotTub_N2", -9.22, -6.15, 0.10, 0),
     ("Seat_HotTub_S1", -10.28, -8.15, 0.10, 180),
     ("Seat_HotTub_S2", -9.22, -8.15, 0.10, 180),
+    # Deep lounge chairs face one another across the spa drinks table.
+    ("Seat_Spa_W", -6.15, -8.60, 0.54, 90),
+    ("Seat_Spa_E", -3.15, -8.60, 0.54, -90),
     # SE terrace bistro pair
     ("Seat_E1", 9.50, -6.55, 0.50, 0),
     ("Seat_E2", 9.50, -8.05, 0.50, 180),
@@ -1609,6 +1949,10 @@ SEATS = [
     ("Seat_S3", 2.20, -9.22, 3.87, 180),
     # Piano bench (pianist faces the keyboard, -x)
     ("Seat_Pno", PIANO_SEAT.x, PIANO_SEAT.y, 0.50, -90),
+    # Sauna step bench (backs to the upper tier)
+    ("Seat_Sauna1", -2.45, -8.86, 3.95, 180),
+    ("Seat_Sauna2", -1.85, -8.86, 3.95, 180),
+    ("Seat_Sauna3", -1.55, -8.00, 3.95, -90),
     # Walk-in closet ottoman, facing the mirror (-y)
     ("Seat_Closet", -9.2, 2.30, 3.89, 0),
 ]
@@ -1866,7 +2210,11 @@ NAV_LINKS = [
     ("upper-sw-bedroom", (0.0, -3.5, 3.50), (-8.0, -3.0, 3.50), (-7.10, -1.68, 3.50), 0.8),
     ("upper-gym", (0.0, -3.5, 3.50), (-1.5, -5.0, 3.54), (-1.62, -6.05, 3.52), 0.8),
     ("upper-east-suite", (0.0, -3.5, 3.50), (8.5, -2.8, 3.50), (7.50, 0.45, 3.50), 0.8),
-    ("upper-sky-den", (0.0, -3.5, 3.50), (1.5, -8.5, 3.53), (-0.75, -8.05, 3.52), 1.2),
+    # Sky den: its north double door from the hall (x 0.0..1.45, y -7.18).
+    ("upper-sky-den", (0.0, -3.5, 3.50), (1.5, -8.5, 3.53), (0.72, -7.18, 3.52), 0.45),
+    # Sauna: doorway through the gym's south wall (x -2.58..-1.92, y -6.3..-6.7).
+    # Radii are tight on purpose: the shortest gap otherwise bridges a wall.
+    ("upper-sauna", (-1.5, -5.0, 3.54), (-1.3, -8.0, 3.53), (-2.25, -6.50, 3.52), 0.6),
 ]
 for link_args in NAV_LINKS:
     connect_nav_regions(*link_args)
@@ -1918,12 +2266,15 @@ NAV_REQUIRED = {
     "upper gym": (-1.5, -5.0, 3.54),
     "upper east suite": (8.5, -2.8, 3.50),
     "upper sky den": (1.5, -8.5, 3.53),
+    "upper sauna": (-1.3, -8.0, 3.53),
     "ground library": (-4.0, -5.3, 0.0),
     "ground patio": (0.0, 7.6, 0.0),
     "ground dining": (6.5, 6.0, 0.0),
     "ground vestibule": (0.2, -7.6, 0.0),
     "sw terrace deck": (-7.95, -6.3, 0.07),
     "sw terrace pocket": (-6.3, -6.1, 0.10),
+    "spa open wall": (-7.62, -7.5, 0.10),
+    "spa seating approach": (-4.6, -7.25, 0.10),
     "patio door threshold": (-8.2, -4.60, 0.10),
     "se terrace deck": (8.5, -6.0, 0.07),
     "upper NW dressing": (-9.2, -0.3, 3.5),
@@ -2033,9 +2384,11 @@ GALLERY = [
     ("Art_Sunrise", "sunrise.jpg", [("-y", -6.57, -4.6, -5.25, -3.7, 1.6)], 0.95),
     ("Art_Moulin", "moulin.jpg", [("-y", -6.57, -2.55, -3.6, -1.42, 1.6)], 1.15),
     # West Wind on the lobby's west wall north of the terrace door, facing in.
-    ("Art_WestWind", "westwind.jpg", [("+x", -7.62, -7.43, -8.25, -6.65, 1.55)], 1.1),
+
     # Covered walk facade wall outside.
-    ("Art_Wave", "wave.jpg", [("-y", -6.30, 5.3, 3.8, 6.9, 1.55)], 1.1),
+    ("Art_Wave", "wave.jpg", [("+y", -9.55, 2.75, 1.95, 3.58, 1.55)], .9),
+    ("Art_Paris1946", "paris-1946.png", [("-y", -6.30, 4.35, 3.4, 5.0, 1.65)], 1.14),
+    ("Art_Paris1948", "paris-1948.png", [("-y", -6.30, 5.50, 4.95, 6.08, 1.65)], 1.14),
     # Dining + bar, east wall.
     ("Art_Kiss", "kiss.jpg", [("-x", 11.18, 7.0, 6.0, 8.6, 1.7)], 1.5),
     ("Art_Sunflowers", "sunflowers.jpg", [("-x", 11.18, 4.3, 2.8, 5.7, 1.6)], 1.3),

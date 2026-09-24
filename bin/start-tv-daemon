@@ -1,0 +1,45 @@
+#!/usr/bin/env node
+// Detach from the deployment shell so its exit cannot terminate TV control.
+const fs = require("fs");
+const path = require("path");
+const { createHash } = require("crypto");
+const { spawn, execFileSync } = require("child_process");
+const { openStore } = require("./lib/tv-service.cjs");
+const root = path.resolve(__dirname, "..");
+const directory = path.join(root, ".lounge-tv");
+const daemon = path.join(__dirname, "tv-daemon");
+const metadata = path.join(directory, "service.json");
+const version = createHash("sha256").update(fs.readFileSync(daemon)).update(fs.readFileSync(path.join(__dirname, "lib/tv-service.cjs"))).digest("hex");
+async function main() {
+  openStore(directory);
+  let previous = {};
+  try { previous = JSON.parse(fs.readFileSync(metadata, "utf8")); } catch { /* first managed start */ }
+  let pid;
+  try { pid = Number(execFileSync("lsof", ["-tiTCP:9917", "-sTCP:LISTEN"], { encoding: "utf8" }).trim()); }
+  catch { /* not listening */ }
+  if (pid) {
+    const command = execFileSync("ps", ["-p", String(pid), "-o", "args="], { encoding: "utf8" });
+    if (!/\bnode\b.*(?:\/|\s)bin\/tv-daemon(?:\s|$)/.test(command)) throw new Error("Port 9917 belongs to another program; not stopping it");
+    if (previous.pid === pid && previous.version === version) return console.log(`TV daemon already current (${pid})`);
+    process.kill(pid, "SIGTERM");
+    for (let attempt = 0; attempt < 30; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      try { process.kill(pid, 0); } catch { pid = null; break; }
+    }
+    if (pid) throw new Error("Old TV daemon did not stop; refusing a second instance");
+  }
+  const log = fs.openSync(path.join(directory, "daemon.log"), "a", 0o600);
+  const child = spawn(process.execPath, [daemon], { cwd: root, detached: true, stdio: ["ignore", log, log] });
+  child.unref();
+  fs.closeSync(log);
+  fs.writeFileSync(metadata, JSON.stringify({ pid: child.pid, version }), { mode: 0o600 });
+  for (let attempt = 0; attempt < 30; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    try {
+      const response = await fetch("http://127.0.0.1:9917/lounge-tv/v1/status", { signal: AbortSignal.timeout(500) });
+      if (response.status === 401) return console.log(`TV daemon ready (${child.pid})`);
+    } catch { /* starting */ }
+  }
+  throw new Error("TV daemon did not become ready; check .lounge-tv/daemon.log");
+}
+main().catch(error => { console.error(error.message); process.exitCode = 1; });

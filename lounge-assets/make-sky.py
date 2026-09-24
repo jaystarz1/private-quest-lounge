@@ -24,7 +24,11 @@ def adjust(rgb, sat=1.0, val=1.0):
 
 scenes = sorted({f.split("-")[0] for f in os.listdir(src_dir) if "-" in f and f.lower().endswith((".jpg", ".jpeg", ".png"))})
 for scene in scenes:
-    cols = [top_color(os.path.join(src_dir, f)) for f in sorted(os.listdir(src_dir)) if f.startswith(scene + "-")]
+    paths = [os.path.join(src_dir, f) for f in sorted(os.listdir(src_dir)) if f.startswith(scene + "-")]
+    if scene in ("dusk", "night"):
+        paths = [p for p in paths if "-north-" not in os.path.basename(p)]
+        paths.append(os.path.join(src_dir, "aligned", f"{scene}-north-a46.png"))
+    cols = [top_color(p) for p in paths]
     if not cols:
         continue
     horizon = tuple(int(sum(c[i] for c in cols) / len(cols)) for i in range(3))

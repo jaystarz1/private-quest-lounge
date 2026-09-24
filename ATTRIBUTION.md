@@ -32,3 +32,14 @@ Upstream Hubs UI assets (icons, sounds) remain MPL-2.0 from the Hubs client.
 
 If you add any external asset, record it here: file, author, source URL, and
 licence, before it ships.
+
+## Café finishing assets (2026-09-08)
+
+The Paris 1946/1948 posters are original, 1940s-inspired illustrations, not scans of historical advertisements. `lounge-assets/make-cafe-finishes.py` creates these textures and the gingham weave. The rose bouquet, vase, door and draped tablecloth are procedural geometry in `build-penthouse.py`.
+
+## Capri spa furnishings (2026-09-11)
+
+The lounge chairs, footrests, ceramic table, cups, lemons, striped canopy,
+Capri sign and towel basket are original procedural geometry in
+`lounge-assets/build-spa.py`. Existing licensed scene stone textures and plant
+geometry are reused; no additional external images or models were introduced.

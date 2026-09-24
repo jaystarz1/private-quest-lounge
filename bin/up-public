@@ -5,8 +5,12 @@ basedir=$(cd "$(dirname "$0")"/.. && pwd)
 source "$basedir"/bin/lib-env
 
 PUBLIC_MEDIA_IP=${PUBLIC_MEDIA_IP:-$(curl -s --max-time 10 https://api.ipify.org)}
-LAN_MEDIA_IP=${LAN_MEDIA_IP:-$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1)}
+LAN_MEDIA_IP=${LAN_MEDIA_IP:-$PRIVATE_NETWORK_IP}
 export PUBLIC_MEDIA_IP LAN_MEDIA_IP
+if ! node -e 'const net=require("net"); process.exit(net.isIPv4(process.env.PUBLIC_MEDIA_IP) && net.isIPv4(process.env.LAN_MEDIA_IP) && process.env.LAN_MEDIA_IP !== "127.0.0.1" ? 0 : 1)'; then
+  echo "A valid public IPv4 and LAN IPv4 are required for lounge media." >&2
+  exit 1
+fi
 # Magic-link email: prefer the operator's Gmail Apps Script webhook
 if [ -z "$LOUNGE_GMAIL_WEBHOOK_URL" ]; then
   LOUNGE_GMAIL_WEBHOOK_URL=$(python3 -c "import json;print(json.load(open('$HOME/.claude.json')).get('mcpServers',{}).get('google-workspace',{}).get('env',{}).get('GMAIL_URL',''))" 2>/dev/null)
@@ -18,12 +22,15 @@ if [ -z "$LOUNGE_SMTP_PASSWORD" ] && [ -f "$HOME/Bedtime_Stories/.env" ]; then
   export LOUNGE_SMTP_PASSWORD
 fi
 echo "Public media (WebRTC) IP: $PUBLIC_MEDIA_IP (LAN: $LAN_MEDIA_IP)"
-echo "Router must forward UDP+TCP 40000-40031 to this machine for voice."
+echo "Media: UDP+TCP 40000-40031; TURN: UDP+TCP 3478 and UDP 40032-40063."
 
 # Build the immutable client while the current lounge stays online. The live
 # container only serves dist, so a process restart is fast and low-memory.
 docker compose -f "$basedir"/docker-compose.yml -f "$basedir"/docker-compose.public.yml run --rm --no-deps hubs-client npm run build:public || exit 1
-docker compose -f "$basedir"/docker-compose.yml -f "$basedir"/docker-compose.public.yml up --build --detach
+docker compose -f "$basedir"/docker-compose.yml -f "$basedir"/docker-compose.public.yml up --build --detach || exit 1
+# A separate mix compile updates disk artifacts, not modules already loaded in
+# the running BEAM. Restart the channel server so source deployments take effect.
+docker compose -f "$basedir"/docker-compose.yml -f "$basedir"/docker-compose.public.yml restart reticulum || exit 1
 
 find_lounge_tunnel_pids() {
   pgrep -f "[c]loudflared tunnel .*cloudflared-lounge\\.yml run"
@@ -54,20 +61,24 @@ else
   echo "Cloudflare tunnel already running as process $managed_pid."
 fi
 
-if ! pgrep -f "bin/tv-daemon" > /dev/null; then
-  echo "Starting lounge TV daemon (in-room power button)..."
-  nohup "$basedir"/bin/tv-daemon > /tmp/lounge-tv-daemon.log 2>&1 &
-else
-  echo "TV daemon already running."
-fi
+node "$basedir/bin/start-tv-daemon" || exit 1
 # Re-assert router port mappings for voice media (UPnP; survives router reboots
 # as long as this re-runs) and keep the Mac awake while the lounge is up.
-if command -v upnpc >/dev/null; then
+if command -v upnpc >/dev/null && upnpc -m "$LAN_MEDIA_IP" -s >/dev/null 2>&1; then
+  mapping_failures=0
   for port in $(seq 40000 40031); do
-    upnpc -e "quest-lounge-voice" -a "$LAN_MEDIA_IP" $port $port UDP 0 >/dev/null 2>&1
-    upnpc -e "quest-lounge-voice" -a "$LAN_MEDIA_IP" $port $port TCP 0 >/dev/null 2>&1
+    upnpc -m "$LAN_MEDIA_IP" -e "quest-lounge-voice" -a "$LAN_MEDIA_IP" "$port" "$port" UDP 0 >/dev/null 2>&1 || mapping_failures=$((mapping_failures + 1))
+    upnpc -m "$LAN_MEDIA_IP" -e "quest-lounge-voice" -a "$LAN_MEDIA_IP" "$port" "$port" TCP 0 >/dev/null 2>&1 || mapping_failures=$((mapping_failures + 1))
   done
-  echo "UPnP voice port mappings asserted (40000-40031 -> $LAN_MEDIA_IP)."
+  for proto in UDP TCP; do
+    upnpc -m "$LAN_MEDIA_IP" -e "quest-lounge-turn" -a "$LAN_MEDIA_IP" 3478 3478 "$proto" 0 >/dev/null 2>&1 || mapping_failures=$((mapping_failures + 1))
+  done
+  for port in $(seq 40032 40063); do
+    upnpc -m "$LAN_MEDIA_IP" -e "quest-lounge-turn-relay" -a "$LAN_MEDIA_IP" "$port" "$port" UDP 0 >/dev/null 2>&1 || mapping_failures=$((mapping_failures + 1))
+  done
+  echo "UPnP mapping failures: $mapping_failures. Any failures require manual router forwarding."
+else
+  echo "UPnP unavailable. Router forwards must be configured manually; remote relay is NOT verified." >&2
 fi
 if ! pgrep -f "caffeinate -si" > /dev/null; then
   nohup caffeinate -si > /dev/null 2>&1 &

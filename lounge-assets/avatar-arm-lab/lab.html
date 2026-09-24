@@ -7,7 +7,7 @@ window.THREE = THREE;
 window.AFRAME = { registerComponent(name, def) { window.__armIkDef = def; } };
 const q = new URLSearchParams(location.search);
 const armSrc = q.get('ik') || 'arm-ik-current.js';
-await new Promise((res, rej) => { const s = document.createElement('script'); s.src = './' + armSrc; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+await import('./' + armSrc);
 const W = 420, H = 560;
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setSize(W * 3, H); document.body.appendChild(renderer.domElement);

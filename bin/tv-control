@@ -1,0 +1,17 @@
+#!/usr/bin/env node
+// Local operator pairing. The admin secret never enters the client bundle.
+const fs = require("fs");
+const path = require("path");
+async function main() {
+  const action = process.argv[2] || "status";
+  if (!["pair", "start", "stop", "retry", "status"].includes(action)) throw new Error("Usage: node bin/tv-control pair|start|stop|retry|status");
+  const { admin } = JSON.parse(fs.readFileSync(path.join(__dirname, "..", ".lounge-tv", "control.json"), "utf8"));
+  const response = await fetch(`http://127.0.0.1:9917/lounge-tv/v1/${action === "pair" ? "pair-code" : action}`, {
+    method: action === "status" ? "GET" : "POST", headers: { Authorization: `Bearer ${admin}` }, signal: AbortSignal.timeout(5000)
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error);
+  if (action === "pair") console.log(`TV pairing code: ${data.code}\nValid for five minutes, for one browser. In the lounge, press PAIR TV and enter this code.`);
+  else console.log(JSON.stringify(data, null, 2));
+}
+main().catch(error => { console.error(error.message); process.exitCode = 1; });

@@ -27,6 +27,7 @@ services:
       RET_PUBLIC_VOICE_HOST: ${PUBLIC_VOICE_HOST:-lounge-voice.thechatbotgenius.com}
       DIALOG_HOSTNAME: ${PUBLIC_VOICE_HOST:-lounge-voice.thechatbotgenius.com}
       DIALOG_PORT: "443"
+      LOUNGE_TURN_URLS: turn:${PUBLIC_MEDIA_IP}:3478?transport=udp,turn:${PUBLIC_MEDIA_IP}:3478?transport=tcp,turn:${LAN_MEDIA_IP}:3478?transport=udp,turn:${LAN_MEDIA_IP}:3478?transport=tcp
       GMAIL_WEBHOOK_URL: ${LOUNGE_GMAIL_WEBHOOK_URL}
       SMTP_SERVER: ${LOUNGE_SMTP_SERVER:-smtp.resend.com}
       SMTP_PORT: "587"
@@ -66,3 +67,21 @@ services:
   postgrest:
     logging: *log-policy
     restart: unless-stopped
+  coturn:
+    image: coturn/coturn:4.17.2-r0
+    restart: unless-stopped
+    logging: *log-policy
+    depends_on:
+      - db
+    command:
+      - -c
+      - /etc/coturn/lounge.conf
+      - --external-ip=${PUBLIC_MEDIA_IP}
+      - --allowed-peer-ip=${PUBLIC_MEDIA_IP}
+      - --allowed-peer-ip=${LAN_MEDIA_IP}
+    ports:
+      - "3478:3478"
+      - "3478:3478/udp"
+      - "40032-40063:40032-40063/udp"
+    volumes:
+      - ./files/lounge-turnserver.conf:/etc/coturn/lounge.conf:ro

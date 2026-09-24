@@ -1,5 +1,5 @@
-# Converts the MetaPerson full-body export into a lounge half-body avatar:
-# - deletes all geometry weighted to leg bones and the leg bones themselves
+# Converts the MetaPerson full-body export into a lounge avatar:
+# - preserves leg bones and their geometry for procedural posture/foot placement
 # - keeps the arm chains so the tracked hands stay attached to the torso
 # - deletes finger bones (Hubs doesn't drive them; weights collapse to the hand)
 # - adds a Mouth empty under Head for scale-audio-feedback tagging
@@ -13,37 +13,10 @@ src, dst = argv[0], argv[1]
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=src)
 
-LEG_PREFIXES = ("LeftUpLeg", "LeftLeg", "LeftFoot", "LeftToe",
-                "RightUpLeg", "RightLeg", "RightFoot", "RightToe")
 FINGER_PREFIXES = ("LeftHandThumb", "LeftHandIndex", "LeftHandMiddle", "LeftHandRing", "LeftHandPinky",
                    "RightHandThumb", "RightHandIndex", "RightHandMiddle", "RightHandRing", "RightHandPinky")
 
 arm = next(o for o in bpy.data.objects if o.type == "ARMATURE")
-
-# --- delete leg-weighted vertices from every mesh ---
-leg_groups = lambda o: [g.index for g in o.vertex_groups if g.name.startswith(LEG_PREFIXES)]
-for obj in [o for o in bpy.data.objects if o.type == "MESH"]:
-    idxs = set(leg_groups(obj))
-    if not idxs:
-        continue
-    doomed = []
-    for v in obj.data.vertices:
-        w = {g.group: g.weight for g in v.groups}
-        tot = sum(w.values()) or 1.0
-        legw = sum(wt for gi, wt in w.items() if gi in idxs)
-        if legw / tot > 0.5 or (obj.matrix_world @ v.co).z < 0.95:
-            doomed.append(v.index)
-    if doomed:
-        bpy.context.view_layer.objects.active = obj
-        bpy.ops.object.mode_set(mode="EDIT")
-        bpy.ops.mesh.select_all(action="DESELECT")
-        bpy.ops.object.mode_set(mode="OBJECT")
-        for i in doomed:
-            obj.data.vertices[i].select = True
-        bpy.ops.object.mode_set(mode="EDIT")
-        bpy.ops.mesh.delete(type="VERT")
-        bpy.ops.object.mode_set(mode="OBJECT")
-        print(f"{obj.name}: removed {len(doomed)} leg verts")
 
 # --- merge finger weights into the parent hand, then drop finger bones ---
 for obj in [o for o in bpy.data.objects if o.type == "MESH"]:
@@ -78,7 +51,7 @@ for obj in [o for o in bpy.data.objects if o.type == "MESH"]:
 bpy.context.view_layer.objects.active = arm
 bpy.ops.object.mode_set(mode="EDIT")
 for eb in list(arm.data.edit_bones):
-    if eb.name.startswith(LEG_PREFIXES) or eb.name.startswith(FINGER_PREFIXES):
+    if eb.name.startswith(FINGER_PREFIXES):
         arm.data.edit_bones.remove(eb)
 for bone_name, target_name in FOLD:
     eb = arm.data.edit_bones.get(bone_name)
@@ -156,6 +129,11 @@ with open(dst, "rb") as handle:
     raw = handle.read()
 json_len = struct.unpack_from("<I", raw, 12)[0]
 gltf = json.loads(raw[20:20 + json_len].decode("utf-8"))
+node_names = {node.get("name") for node in gltf["nodes"]}
+required_legs = {side + suffix for side in ("Left", "Right")
+                 for suffix in ("UpLeg", "Leg", "Foot", "ToeBase", "Toe_End")}
+if not required_legs.issubset(node_names) or len(gltf["skins"][0]["joints"]) != 29:
+    raise RuntimeError("full-body export must preserve the 29-joint lounge rig, including all ten leg joints")
 tagged = 0
 for node in gltf["nodes"]:
     if "mesh" not in node:

@@ -21,6 +21,10 @@ for fn in sorted(os.listdir(src_dir)):
     if not m:
         continue
     d, anchor = m.group(1), int(m.group(2))
+    if d == "north":
+        # The registered night edit lives in aligned/night-north-a46.png.
+        # Do not regenerate the obsolete different-camera north photo.
+        continue
     im = Image.open(os.path.join(src_dir, fn)).convert("RGB")
     a = np.asarray(im, np.float64) / 255.0
     h, w, _ = a.shape
