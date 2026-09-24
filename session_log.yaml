@@ -4,7 +4,7 @@ meta:
 current_state:
   active_task: Upstairs sauna rebuild and sky den declutter
   status: complete
-  next_action: Headset walk-through of the sauna (gym door, benches, Seat_Sauna1-3) and the den's hall door; Two-Quest TV check still pending.
+  next_action: 'Two-Quest test with the remote user via the GCP relay (34.130.119.196); watch dialog logs for restartIce storms.'
   summary: Sauna (x -3..-0.7, y -6.7..-9.7 upstairs) now opens from the gym through a cut in the mirror wall, sealed from the den, cedar-lined with two-tier bench, stove and 3 seats. Den tub chairs removed and its hall door opened; nav links tightened so bridges cannot cross walls.
 pending_tasks:
 - task: 'Voice server rejects new room connections: mediasoup no more available ports (32 UDP attempts), also fails force_tcp. Occurred before and after the scene release; active transports
@@ -27,6 +27,8 @@ pending_tasks:
   priority: low
 session_history:
 - date: '2026-09-23'
+  summary: 'Remote-user TV spinner diagnosed: remote peer ICE fails every 15 s both directions; Rogers gateway has no UPnP; fixed with GCP relay VM lounge-relay (34.130.119.196) DNAT over Tailscale to mac-studio.'
+- date: '2026-09-23'
   summary: Sauna rebuilt off the gym (cedar, benches, stove, seats), den chairs removed and hall door opened; spa/cafe gates pass, deployed.
 - date: '2026-09-23'
   summary: TV-facing sofa seats (Seat_TV1-3) and per-viewer light dimmer with 50% auto-dim during TV; 31 client tests, spa/cafe gates pass, deployed.
@@ -34,6 +36,3 @@ session_history:
   summary: Quest hand-input filter by profile; TV duplicate-producer race and ghost-feeder fixes; woven/wicker/teak textures on patio and Capri seating; 36 tests and spa/cafe gates pass.
 - date: '2026-09-11'
   summary: Updated hot tub drinks table with Aperol Spritz props and rebuilt GLBs; verify-spa passes 79 checks.
-- date: '2026-09-11'
-  summary: 'Deployed Capri spa: fake lifts/partition removed, facing seated lounge pair and table added; 184 geometry checks pass and public asset hash verified; live joining blocked
-    by prior mediasoup port exhaustion.'

@@ -16,4 +16,5 @@ fi
 pkill -f "[c]loudflared tunnel .*cloudflared-lounge\\.yml run" 2>/dev/null
 pkill -f "$basedir/bin/tv-daemon" 2>/dev/null && echo "TV daemon stopped."
 pkill -f "caffeinate -si" 2>/dev/null && echo "caffeinate stopped."
+"$basedir"/bin/relay off
 echo "Lounge is down."

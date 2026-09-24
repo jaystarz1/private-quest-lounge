@@ -4,7 +4,12 @@ PATH="/Applications/Docker.app/Contents/Resources/bin:/opt/homebrew/bin:/usr/loc
 basedir=$(cd "$(dirname "$0")"/.. && pwd)
 source "$basedir"/bin/lib-env
 
-PUBLIC_MEDIA_IP=${PUBLIC_MEDIA_IP:-$(curl -s --max-time 10 https://api.ipify.org)}
+# Remote media goes through the on-demand GCP relay (bin/relay); down-public stops it.
+# The Rogers gateway has no UPnP, so without the relay only LAN headsets get media.
+if [ -z "$PUBLIC_MEDIA_IP" ]; then
+  "$basedir"/bin/relay on && PUBLIC_MEDIA_IP=$(cat "$basedir/.lounge-relay-ip")
+  PUBLIC_MEDIA_IP=${PUBLIC_MEDIA_IP:-$(curl -s --max-time 10 https://api.ipify.org)}
+fi
 LAN_MEDIA_IP=${LAN_MEDIA_IP:-$PRIVATE_NETWORK_IP}
 export PUBLIC_MEDIA_IP LAN_MEDIA_IP
 if ! node -e 'const net=require("net"); process.exit(net.isIPv4(process.env.PUBLIC_MEDIA_IP) && net.isIPv4(process.env.LAN_MEDIA_IP) && process.env.LAN_MEDIA_IP !== "127.0.0.1" ? 0 : 1)'; then

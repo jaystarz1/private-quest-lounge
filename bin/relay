@@ -1,0 +1,51 @@
+#!/bin/bash
+# On-demand media relay for remote headsets: bin/relay on|off|status|ip
+# GCP VM lounge-relay forwards TCP/UDP 40000-40031, 3478 and UDP 40032-40063
+# over Tailscale to this Mac (the Rogers gateway has no UPnP or forwards).
+# Stopped it costs only its disk (~$0.50/month); the IP is ephemeral, so
+# "on" re-points dialog/coturn/reticulum at whatever address it gets.
+basedir=$(cd "$(dirname "$0")"/.. && pwd)
+PROJECT=psychic-surface-468615-k8
+ZONE=northamerica-northeast2-a
+VM=lounge-relay
+gc() { gcloud "$@" --project "$PROJECT" --zone "$ZONE" --quiet; }
+ip() { gc compute instances describe "$VM" --format='value(networkInterfaces[0].accessConfigs[0].natIP)' 2>/dev/null; }
+state() { gc compute instances describe "$VM" --format='value(status)' 2>/dev/null; }
+
+case "${1:-status}" in
+  on)
+    [ "$(state)" = RUNNING ] || gc compute instances start "$VM" >/dev/null || exit 1
+    RELAY_IP=$(ip)
+    [ -n "$RELAY_IP" ] || { echo "Relay has no public IP" >&2; exit 1; }
+    # End-to-end check only when the stack is already listening on this Mac.
+    if nc -z -G2 127.0.0.1 40000 2>/dev/null; then
+      for i in $(seq 1 30); do nc -z -G2 "$RELAY_IP" 40000 2>/dev/null && break; sleep 3; done
+      nc -z -G2 "$RELAY_IP" 40000 2>/dev/null || { echo "Relay $RELAY_IP is up but not reaching the Mac (check Tailscale)" >&2; exit 1; }
+    fi
+    echo "$RELAY_IP" > "$basedir/.lounge-relay-ip"
+    echo "Relay on: $RELAY_IP"
+    # --restart: re-point running media services (drops anyone in the room).
+    if [ "$2" = "--restart" ]; then
+      source "$basedir"/bin/lib-env
+      export PUBLIC_MEDIA_IP=$RELAY_IP LAN_MEDIA_IP=${LAN_MEDIA_IP:-$PRIVATE_NETWORK_IP}
+      LOUNGE_GMAIL_WEBHOOK_URL=$(python3 -c "import json;print(json.load(open('$HOME/.claude.json')).get('mcpServers',{}).get('google-workspace',{}).get('env',{}).get('GMAIL_URL',''))" 2>/dev/null)
+      [ -f "$HOME/Bedtime_Stories/.env" ] && LOUNGE_SMTP_PASSWORD=$(grep '^RESEND_API_KEY=' "$HOME/Bedtime_Stories/.env" | cut -d= -f2)
+      export LOUNGE_GMAIL_WEBHOOK_URL LOUNGE_SMTP_PASSWORD
+      docker compose -f "$basedir"/docker-compose.yml -f "$basedir"/docker-compose.public.yml up -d --no-deps --no-build dialog coturn reticulum
+    fi
+    ;;
+  off)
+    [ "$(state)" = TERMINATED ] || gc compute instances stop "$VM" >/dev/null || exit 1
+    # A reserved IP bills ~$7/month even while stopped: swap it for an ephemeral one.
+    if gcloud compute addresses describe lounge-relay-ip --region "${ZONE%-*}" --project "$PROJECT" >/dev/null 2>&1; then
+      gc compute instances delete-access-config "$VM" --access-config-name "external-nat" >/dev/null 2>&1
+      gcloud compute addresses delete lounge-relay-ip --region "${ZONE%-*}" --project "$PROJECT" --quiet >/dev/null
+      gc compute instances add-access-config "$VM" --access-config-name "external-nat" >/dev/null
+    fi
+    rm -f "$basedir/.lounge-relay-ip"
+    echo "Relay off (billing stopped except its disk)."
+    ;;
+  ip) ip ;;
+  status) echo "$(state) $(ip)" ;;
+  *) echo "Usage: bin/relay on [--restart]|off|status|ip" >&2; exit 1 ;;
+esac
