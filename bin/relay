@@ -5,9 +5,10 @@
 # Stopped it costs only its disk (~$0.50/month); the IP is ephemeral, so
 # "on" re-points dialog/coturn/reticulum at whatever address it gets.
 basedir=$(cd "$(dirname "$0")"/.. && pwd)
-PROJECT=psychic-surface-468615-k8
-ZONE=northamerica-northeast2-a
-VM=lounge-relay
+# Project/zone live in the untracked .lounge-relay.env (PROJECT=..., ZONE=...).
+[ -f "$basedir/.lounge-relay.env" ] || { echo "Missing .lounge-relay.env (PROJECT, ZONE); relay disabled" >&2; exit 1; }
+source "$basedir/.lounge-relay.env"
+VM=${VM:-lounge-relay}
 gc() { gcloud "$@" --project "$PROJECT" --zone "$ZONE" --quiet; }
 ip() { gc compute instances describe "$VM" --format='value(networkInterfaces[0].accessConfigs[0].natIP)' 2>/dev/null; }
 state() { gc compute instances describe "$VM" --format='value(status)' 2>/dev/null; }

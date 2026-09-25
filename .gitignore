@@ -1,3 +1,4 @@
 /services/
 /.lounge-tv/
 .lounge-relay-ip
+.lounge-relay.env
