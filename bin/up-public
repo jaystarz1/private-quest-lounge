@@ -6,8 +6,9 @@ source "$basedir"/bin/lib-env
 
 # Remote media goes through the on-demand GCP relay (bin/relay); down-public stops it.
 # The Rogers gateway has no UPnP, so without the relay only LAN headsets get media.
+# The relay VM bills while running, so it is opt-in: LOUNGE_RELAY=1 bin/up-public.
 if [ -z "$PUBLIC_MEDIA_IP" ]; then
-  "$basedir"/bin/relay on && PUBLIC_MEDIA_IP=$(cat "$basedir/.lounge-relay-ip")
+  [ "$LOUNGE_RELAY" = 1 ] && "$basedir"/bin/relay on && PUBLIC_MEDIA_IP=$(cat "$basedir/.lounge-relay-ip")
   PUBLIC_MEDIA_IP=${PUBLIC_MEDIA_IP:-$(curl -s --max-time 10 https://api.ipify.org)}
 fi
 LAN_MEDIA_IP=${LAN_MEDIA_IP:-$PRIVATE_NETWORK_IP}

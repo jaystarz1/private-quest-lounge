@@ -51,7 +51,12 @@ for name in ('Seat_Spa_W','Seat_Spa_E'):
     clear(p+Vector((0,0,.75)),other+Vector((0,0,.75)),'seated eye-to-eye sightline')
 for name in ('SpaChairW','SpaChairE','SpaTableTop','SpaAwning','SpaSignCapri','SpaAperolGlass0','SpaAperolGlass1'):
     check(name in bpy.data.objects,f'missing furnishing {name}')
-# Sign must face into the room (+Y), not show mirrored lettering from its back.
+# Sign hangs on the north wall and must face into the room (-Y), not show
+# mirrored lettering from its back.
 ob=bpy.data.objects['SpaSignCapri']
-check((ob.matrix_world.to_quaternion()@Vector((0,0,1))).y>.99,'sign faces wall')
+check((ob.matrix_world.to_quaternion()@Vector((0,0,1))).y<-.99,'sign faces wall')
+# The south edge is open balcony: no wall between eye height and the view.
+for x in (-6.5,-5.0,-3.0,-1.0,0.6,2.2,3.4):
+    for z in (.3,1.6,2.3):
+        clear((x,-9.2,z),(x,-9.72,z),f'south wall remains at {x,z}')
 print(f'SPA PASS: {checks} checks')

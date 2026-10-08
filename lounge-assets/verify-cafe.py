@@ -8,7 +8,8 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=sys.argv[-1])
 vertices, faces = [], []
 for ob in bpy.context.scene.objects:
-    if ob.type != 'MESH' or ob.name.startswith(('NavMesh', 'View', 'Sky', 'Seat', 'Spawn')):
+    # Animated figures (Fig_*) are skipped: their bind poses are not architecture.
+    if ob.type != 'MESH' or ob.name.startswith(('NavMesh', 'View', 'Sky', 'Seat', 'Spawn', 'Fig_')):
         continue
     base = len(vertices)
     vertices.extend(ob.matrix_world @ v.co for v in ob.data.vertices)
@@ -30,7 +31,8 @@ for x in (8.5,9.45,10.4):
     hit = tree.ray_cast(Vector((x,-4.6,1.5)),Vector((0,0,-1)),.5)[0]
     assert hit is not None and abs(hit.z-1.14)<.005, f'counter height: {hit}'
     checks += 1
-for x,y in ((6.5,-5.9),(7.2,-5.9),(8,-5.9),(8.7,-5.9),(7,-7),(8,-8.8),(5,-8)):
+# (8.8,-8.8): the lane between the couple's table (cafe_figures.TABLE) and the visitors' table.
+for x,y in ((6.5,-5.9),(7.2,-5.9),(8,-5.9),(8.7,-5.9),(7,-7),(8.8,-8.8),(5,-8)):
     hit = tree.ray_cast(Vector((x,y,2)),Vector((0,0,-1)),2)[0]
     assert hit is not None and abs(hit.z-.10)<.006, f'walkway obstruction/height at {(x,y)}: {hit}'
     checks += 1
@@ -46,7 +48,8 @@ for x in (6.65,7.12,7.58):
         clear((x,-5.7,z),(0,1,0),3.0,'cafe door to kitchen')
         clear((x,-2.7,z),(0,-1,0),3.0,'cafe door to terrace')
 # Kitchen worktop must remain exposed below the separate serving ledge.
-for x in (8.5,9.45,10.4):
+# (x 10.23+ is the microwave body, which sits on the worktop.)
+for x in (8.5,9.45,10.1):
     hit=tree.ray_cast(Vector((x,-3.9,1.5)),Vector((0,0,-1)),1.0)[0]
     assert hit is not None and .85 < hit.z < 1.08, f'worktop covered by serving counter: {hit}'
     checks += 1
@@ -61,7 +64,7 @@ for name in ('Art_Paris1946','Art_Paris1948','CafeTablecloth','CafeRoseVase','Ca
     assert bpy.data.objects.get(name), f'missing finish: {name}'
     checks += 1
 wave=bpy.data.objects['Art_Wave']
-assert wave.matrix_world.translation.y < -9.5, 'Japanese painting still outside cafe'
+assert wave.matrix_world.translation.y > -9.5, 'Japanese painting left on the removed south wall'
 planter=bpy.data.objects['LedgeE1']
 for corner in planter.bound_box:
     c=planter.matrix_world@Vector(corner)
@@ -79,7 +82,7 @@ for ob in bpy.context.scene.objects:
 pt=BVHTree.FromPolygons(pv,pf)
 for k in range(24):
     a=math.tau*k/24
-    x,y=3.4+.16*math.cos(a),-9.36+.16*math.sin(a)
+    x,y=3.4+.16*math.cos(a),-8.20+.16*math.sin(a)   # moved off the Rovers roof door
     hit=pt.ray_cast(Vector((x,y,4.4)),Vector((0,0,-1)),1.0)[0]
     assert hit is not None and hit.z<3.56, f'planter intersects furniture: {hit}'
     checks+=1

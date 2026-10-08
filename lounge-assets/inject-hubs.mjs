@@ -48,13 +48,18 @@ const pointLight = (intensity, range) => ({
 const LIGHTS = {
   Light_A: [1.3, 10], // lower floor west
   Light_C: [1.2, 10], // lower floor east
-  Light_G: [1.0, 9], // sky den
-  Light_H: [1.1, 9] // elevator lobby
+  Light_G: [1.3, 12], // Rovers bar, sky den above it, roof terrace
+  Light_H: [0.9, 8] // den banker's lamp (also reaches the spa)
 };
 
 json.extensionsUsed = [...new Set([...(json.extensionsUsed || []), "MOZ_hubs_components"])];
 json.extensions = { ...(json.extensions || {}), MOZ_hubs_components: { version: 4 } };
-const counts = { nav: 0, spawn: 0, seat: 0, light: 0, ambient: 0, mirror: 0 };
+const counts = { nav: 0, spawn: 0, seat: 0, light: 0, ambient: 0, mirror: 0, figures: 0 };
+const metaNode = (json.nodes || []).find(nd => /^DinnerMeta_L\d+_W\d+_P\d+$/.test(nd.name || ""));
+if (!metaNode) throw new Error("DinnerMeta_* node missing (dinner_figures.py names the linger window)");
+const [, metaAt, metaLen, metaPhase] = metaNode.name.match(/^DinnerMeta_L(\d+)_W(\d+)_P(\d+)$/);
+const DINNER_META = { at: Number(metaAt) / 1000, len: Number(metaLen), phase: Number(metaPhase) };
+console.log("dinner linger:", JSON.stringify(DINNER_META));
 for (const node of json.nodes || []) {
   const n = node.name || "";
   let comps = null;
@@ -81,6 +86,22 @@ for (const node of json.nodes || []) {
     // mirror's width and height; it faces the node's +Z.
     comps = { mirror: { color: "#a8adb2" } };
     counts.mirror++;
+  } else if (/^Fig_[A-Za-z]+$/.test(n) && node.mesh === undefined) {
+    // Rovers regulars and the NE bed couple (rovers_figures.py): each armature
+    // loops its own clip, found by name. serverClock pins every clip to the
+    // shared server clock, so all headsets see the same moment whenever they
+    // joined, and clips sharing a length (the bar group) stay in step.
+    // The dinner party and its prop rig (Fig_Din*, dinner_figures.py) have two
+    // clips: the dinner plays once from the start of the room session (the
+    // earliest joiner still present), then the lounge clip loops.
+    // dinner_figures.py names an empty DinnerMeta_L<ms>_W<s>_P<s>: the linger
+    // window the client may cut short and the phase the evening locks to.
+    comps = /^Fig_Din/.test(n)
+      ? { "loop-animation": { clip: `${n}Dinner,${n}Lounge`, paused: false, serverClock: true, session: true,
+                              lingerAt: DINNER_META.at, lingerLen: DINNER_META.len, phase: DINNER_META.phase },
+          frustrum: { culled: false } }
+      : { "loop-animation": { clip: `${n}Loop`, paused: false, serverClock: true }, frustrum: { culled: false } };
+    counts.figures++;
   } else if (n === "AmbientLight") {
     comps = { "ambient-light": { color: "#ffe8d2", intensity: 0.6 } };
     counts.ambient++;
@@ -90,28 +111,61 @@ for (const node of json.nodes || []) {
   }
   if (comps) node.extensions = { ...(node.extensions || {}), MOZ_hubs_components: comps };
 }
-const tagged = counts.nav + counts.spawn + counts.seat + counts.light + counts.ambient + counts.mirror;
+// figures: 28 + the hot tub (TubA/B/S, TubBall) + the café (DinMime, DinCafA/B, DinCafeProps)
+const tagged = counts.nav + counts.spawn + counts.seat + counts.light + counts.ambient + counts.mirror + counts.figures;
 console.log("tag counts:", JSON.stringify(counts));
-if (counts.nav !== 1 || counts.spawn !== 2 || counts.seat < 40 || counts.light !== 4 || counts.ambient !== 1 || counts.mirror !== 1) {
+if (counts.nav !== 1 || counts.spawn !== 2 || counts.seat < 40 || counts.light !== 4 || counts.ambient !== 1 || counts.mirror !== 1 || counts.figures !== 36) {
   throw new Error(`unexpected tag counts: ${JSON.stringify(counts)}`);
 }
+// Every figure needs its own clip, and the bar group (barman + three
+// regulars) must share one length so their glass hand-offs stay in step.
+const anims = json.animations || [];
+const figNodes = (json.nodes || []).filter(nd => /^Fig_[A-Za-z]+$/.test(nd.name || "") && nd.mesh === undefined);
+const clipLen = name => {
+  const a = anims.find(an => an.name === name);
+  return a && Math.max(...a.samplers.map(sm => json.accessors[sm.input].max[0]));
+};
+const clipsOf = name => (/^Fig_Din/.test(name) ? [`${name}Dinner`, `${name}Lounge`] : [`${name}Loop`]);
+let clipCount = 0;
+for (const nd of figNodes) {
+  for (const c of clipsOf(nd.name)) {
+    if (!clipLen(c)) throw new Error(`figure ${nd.name} has no clip ${c}`);
+    clipCount++;
+  }
+  if (nd.extensions?.MOZ_hubs_components?.["loop-animation"]?.serverClock !== true) throw new Error(`figure ${nd.name} is not on the server clock`);
+}
+if (anims.length !== clipCount) throw new Error(`${anims.length} clips for ${clipCount} expected`);
+// The evening is phase-locked to the Rovers: both dinner-party clips are whole
+// phases long, the regulars loop on exactly one phase, and the linger window
+// sits inside the dinner clip.
+for (const nd of figNodes.filter(nd => /^Fig_Din/.test(nd.name))) {
+  for (const c of clipsOf(nd.name)) {
+    const len = clipLen(c), r = len / DINNER_META.phase;
+    if (Math.abs(r - Math.round(r)) > 1e-3) throw new Error(`${c} is ${len}s, not whole phases of ${DINNER_META.phase}s`);
+  }
+  if (DINNER_META.at + DINNER_META.len > clipLen(`${nd.name}Dinner`) - 1) throw new Error("linger window past the dinner clip");
+}
+if (Math.abs(clipLen("Fig_BmLoop") - DINNER_META.phase) > 1e-3) throw new Error(`Rovers loop is not the dinner phase`);
+const barLens = ["Fig_Bm", "Fig_BarA", "Fig_BarB", "Fig_BarC"].map(nm => clipLen(`${nm}Loop`));
+if (barLens.some(len => Math.abs(len - barLens[0]) > 1e-4)) throw new Error(`bar group clip lengths differ: ${barLens}`);
 // The unusable source piano (Object_108) must stay deleted; the procedural
 // black-lacquer grand (Pno_*) that replaced it is expected.
 if ((json.nodes || []).some(node => node.name === "Object_108")) throw new Error("source piano Object_108 still present");
 if (!(json.nodes || []).some(node => node.name === "Pno_Body")) throw new Error("procedural piano missing");
 const bedSeatNodes = (json.nodes || []).filter(node => /^Seat_Bed_/.test(node.name || ""));
 if (
-  bedSeatNodes.length !== 6 ||
+  bedSeatNodes.length !== 4 ||
   bedSeatNodes.some(
     node =>
       node.extensions?.MOZ_hubs_components?.waypoint?.willMaintainWorldUp !== true ||
       node.extensions?.MOZ_hubs_components?.waypoint?.eyeHeight !== 0.60
   )
 ) {
-  throw new Error("six upright bed seats with 0.60 m seated eye height are required");
+  throw new Error("four upright bed seats (NE bed taken by the couple) with 0.60 m seated eye height are required");
 }
 const hotTubSeatNodes = (json.nodes || []).filter(node => /^Seat_HotTub_/.test(node.name || ""));
-if (hotTubSeatNodes.length !== 4) throw new Error(`expected four hot-tub seats, found ${hotTubSeatNodes.length}`);
+// The south pair belongs to the animated hot tub regulars (rovers_figures.py).
+if (hotTubSeatNodes.length !== 2) throw new Error(`expected two hot-tub seats, found ${hotTubSeatNodes.length}`);
 for (const node of hotTubSeatNodes) {
   if (node.extensions?.MOZ_hubs_components?.waypoint?.eyeHeight !== 0.70) {
     throw new Error(`${node.name} is missing its 0.70 m seated eye height`);

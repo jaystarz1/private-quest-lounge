@@ -1,11 +1,11 @@
 meta:
-  last_updated: '2026-09-23'
+  last_updated: '2026-10-08'
   purpose: Operational continuity for the private Quest lounge
 current_state:
-  active_task: Upstairs sauna rebuild and sky den declutter
+  active_task: 'Hot tub regulars + Café du Parc (couple, mime, espresso service)'
   status: complete
-  next_action: 'Two-Quest test with the remote user via the GCP relay (34.130.119.196); watch dialog logs for restartIce storms.'
-  summary: Sauna (x -3..-0.7, y -6.7..-9.7 upstairs) now opens from the gym through a cut in the mirror wall, sealed from the den, cedar-lined with two-tier bench, stove and 3 seats. Den tub chairs removed and its hall door opened; nav links tightened so bridges cannot cross walls.
+  next_action: 'Jay to check in the headset: hot tub (ball games, barmaid cocktail run ~105-180 s into each 6-min Rovers loop), café mime acts (juggling, mime, unicycle; Rovers red with the shelf couple in the after-dinner loop), chef/W1 espresso runs.'
+  summary: 'Deployed 2026-10-08 (release 1791437175653): hot tub cast in rovers_figures (TubA/B/S, Fig_TubBall, barmaid job_tub) and the café in cafe_figures on the dinner session clock (couple, mime, chef + W1 espressos); lounge loop now 1440 s. All gates pass on real geometry.'
 pending_tasks:
 - task: 'Voice server rejects new room connections: mediasoup no more available ports (32 UDP attempts), also fails force_tcp. Occurred before and after the scene release; active transports
     observed, service not restarted. Diagnose before multiplayer acceptance.'
@@ -26,13 +26,13 @@ pending_tasks:
     viewpoint behavior.'
   priority: low
 session_history:
-- date: '2026-09-23'
-  summary: 'Remote-user TV spinner diagnosed: remote peer ICE fails every 15 s both directions; Rogers gateway has no UPnP; fixed with GCP relay VM lounge-relay (34.130.119.196) DNAT over Tailscale to mac-studio.'
-- date: '2026-09-23'
-  summary: Sauna rebuilt off the gym (cedar, benches, stove, seats), den chairs removed and hall door opened; spa/cafe gates pass, deployed.
-- date: '2026-09-23'
-  summary: TV-facing sofa seats (Seat_TV1-3) and per-viewer light dimmer with 50% auto-dim during TV; 31 client tests, spa/cafe gates pass, deployed.
-- date: '2026-09-23'
-  summary: Quest hand-input filter by profile; TV duplicate-producer race and ghost-feeder fixes; woven/wicker/teak textures on patio and Capri seating; 36 tests and spa/cafe gates pass.
-- date: '2026-09-11'
-  summary: Updated hot tub drinks table with Aperol Spritz props and rebuilt GLBs; verify-spa passes 79 checks.
+- date: '2026-10-08'
+  summary: 'Hot tub regulars (ball games, barmaid cocktails) + Café du Parc (couple, mime 3 acts + Rovers red, chef/W1 espressos; lounge 1440 s); deployed.'
+- date: '2026-10-07'
+  summary: 'Planters: stripped the curtain sliver the house-plant copy dragged (9 plants); after-dinner Rovers move shipped; deployed.'
+- date: '2026-10-06'
+  summary: 'Cocktail lounge floor shimmer: old sectional leg pads/base slabs left at z 0 (delete box started at 0.0) removed; gates pass; deployed.'
+- date: '2026-10-05'
+  summary: 'Patio -> cocktail lounge (bar, lounge sets, high tables), French door from dining, dinner ends there with mingling groups; route gates catch walls; deployed.'
+- date: '2026-10-04'
+  summary: 'Rovers barmaid + Jay''s reserved table + piano stout, darts fill the loop with bar/toilet trips (old game idled 68 s); route gates now catch walls; deployed.'

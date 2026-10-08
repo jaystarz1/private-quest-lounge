@@ -2,3 +2,5 @@
 /.lounge-tv/
 .lounge-relay-ip
 .lounge-relay.env
+lounge-assets/.work/
+__pycache__/
