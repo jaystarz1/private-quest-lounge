@@ -13,9 +13,6 @@ pending_tasks:
 - task: 'Incoming-call instability investigated only: no XR visibility suspension, unbounded resume delta affects movement/turn/IK, Quest mic-ended path launches duplicate capture restarts
     (VM reproduced orphan capture). Native call not reproduced; implementation remains pending.'
   priority: high
-- task: Approval to publish code and avatar/panorama assets to public jaystarz1/hubs-lounge, jaystarz1/reticulum-lounge and jaystarz1/private-quest-lounge. Use scoped safe-git-push.sh
-    only after approval; preserve unrelated cloudflared-lounge.log and seat-marker-renders.
-  priority: high
 - task: 'Router: forward TCP/UDP 3478 and UDP 40032-40063 to 10.0.0.29 for TURN; direct SFU media uses TCP/UDP 40000-40031. LAN relay passes; public TURN TCP was refused and UPnP found
     no usable gateway.'
   priority: high
@@ -27,7 +24,7 @@ pending_tasks:
   priority: low
 session_history:
 - date: '2026-10-08'
-  summary: 'Hot tub regulars (ball games, barmaid cocktails) + Café du Parc (couple, mime 3 acts + Rovers red, chef/W1 espressos; lounge 1440 s); deployed.'
+  summary: 'Hot tub regulars + Café du Parc (couple, mime 3 acts + Rovers red, chef/W1 espressos; lounge 1440 s); deployed; all three repos pushed (lounge branch).'
 - date: '2026-10-07'
   summary: 'Planters: stripped the curtain sliver the house-plant copy dragged (9 plants); after-dinner Rovers move shipped; deployed.'
 - date: '2026-10-06'
