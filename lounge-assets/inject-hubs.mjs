@@ -55,10 +55,19 @@ const LIGHTS = {
 json.extensionsUsed = [...new Set([...(json.extensionsUsed || []), "MOZ_hubs_components"])];
 json.extensions = { ...(json.extensions || {}), MOZ_hubs_components: { version: 4 } };
 const counts = { nav: 0, spawn: 0, seat: 0, light: 0, ambient: 0, mirror: 0, figures: 0 };
-const metaNode = (json.nodes || []).find(nd => /^DinnerMeta_L\d+_W\d+_P\d+$/.test(nd.name || ""));
-if (!metaNode) throw new Error("DinnerMeta_* node missing (dinner_figures.py names the linger window)");
-const [, metaAt, metaLen, metaPhase] = metaNode.name.match(/^DinnerMeta_L(\d+)_W(\d+)_P(\d+)$/);
-const DINNER_META = { at: Number(metaAt) / 1000, len: Number(metaLen), phase: Number(metaPhase) };
+const animNames = new Set((json.animations || []).map(a => a.name));
+function regularSeq(n) {
+  const show = animNames.has(`${n}Show`), after = animNames.has(`${n}After`);
+  if (!show && !after) return null;
+  if (show) return { clips: [`${n}Loop`, `${n}Show`, after ? `${n}After` : `${n}Loop`], cues: [DINNER_META.finale, DINNER_META.dinner] };
+  return { clips: [`${n}Loop`, `${n}After`], cues: [DINNER_META.finale] };
+}
+const META_RE = /^DinnerMeta_L(\d+)_W(\d+)_P(\d+)_F(\d+)_D(\d+)$/;
+const metaNode = (json.nodes || []).find(nd => META_RE.test(nd.name || ""));
+if (!metaNode) throw new Error("DinnerMeta_* node missing (dinner_figures.py names the linger window and the finale)");
+const [, metaAt, metaLen, metaPhase, metaF, metaD] = metaNode.name.match(META_RE);
+const DINNER_META = { at: Number(metaAt) / 1000, len: Number(metaLen), phase: Number(metaPhase),
+                      finale: Number(metaF), dinner: Number(metaD) };
 console.log("dinner linger:", JSON.stringify(DINNER_META));
 for (const node of json.nodes || []) {
   const n = node.name || "";
@@ -96,11 +105,19 @@ for (const node of json.nodes || []) {
     // earliest joiner still present), then the lounge clip loops.
     // dinner_figures.py names an empty DinnerMeta_L<ms>_W<s>_P<s>: the linger
     // window the client may cut short and the phase the evening locks to.
+    // A Rovers regular with a Show clip (the mime's finale) and/or an After
+    // clip (the rest of the night, nobody watching) plays its clips in session
+    // order too: the loop until the finale, the show over it, then after.
+    const seq = regularSeq(n);
     comps = /^Fig_Din/.test(n)
       ? { "loop-animation": { clip: `${n}Dinner,${n}Lounge`, paused: false, serverClock: true, session: true,
-                              lingerAt: DINNER_META.at, lingerLen: DINNER_META.len, phase: DINNER_META.phase },
+                              phase: DINNER_META.phase },
           frustrum: { culled: false } }
-      : { "loop-animation": { clip: `${n}Loop`, paused: false, serverClock: true }, frustrum: { culled: false } };
+      : seq
+        ? { "loop-animation": { clip: seq.clips.join(","), cues: seq.cues.join(","), paused: false, serverClock: true,
+                                session: true, phase: DINNER_META.phase },
+            frustrum: { culled: false } }
+        : { "loop-animation": { clip: `${n}Loop`, paused: false, serverClock: true }, frustrum: { culled: false } };
     counts.figures++;
   } else if (n === "AmbientLight") {
     comps = { "ambient-light": { color: "#ffe8d2", intensity: 0.6 } };
@@ -111,10 +128,10 @@ for (const node of json.nodes || []) {
   }
   if (comps) node.extensions = { ...(node.extensions || {}), MOZ_hubs_components: comps };
 }
-// figures: 28 + the hot tub (TubA/B/S, TubBall) + the café (DinMime, DinCafA/B, DinCafeProps)
+// figures: 28 + the hot tub (TubA/B/S, TubBall) + the café (DinMime, DinCafA/B, DinCafeProps) + the Rovers' second barmaid (DinRovW)
 const tagged = counts.nav + counts.spawn + counts.seat + counts.light + counts.ambient + counts.mirror + counts.figures;
 console.log("tag counts:", JSON.stringify(counts));
-if (counts.nav !== 1 || counts.spawn !== 2 || counts.seat < 40 || counts.light !== 4 || counts.ambient !== 1 || counts.mirror !== 1 || counts.figures !== 36) {
+if (counts.nav !== 1 || counts.spawn !== 2 || counts.seat < 40 || counts.light !== 4 || counts.ambient !== 1 || counts.mirror !== 1 || counts.figures !== 37) {
   throw new Error(`unexpected tag counts: ${JSON.stringify(counts)}`);
 }
 // Every figure needs its own clip, and the bar group (barman + three
@@ -125,7 +142,8 @@ const clipLen = name => {
   const a = anims.find(an => an.name === name);
   return a && Math.max(...a.samplers.map(sm => json.accessors[sm.input].max[0]));
 };
-const clipsOf = name => (/^Fig_Din/.test(name) ? [`${name}Dinner`, `${name}Lounge`] : [`${name}Loop`]);
+const clipsOf = name => (/^Fig_Din/.test(name) ? [`${name}Dinner`, `${name}Lounge`]
+  : [`${name}Loop`, ...[`${name}Show`, `${name}After`].filter(c => animNames.has(c))]);
 let clipCount = 0;
 for (const nd of figNodes) {
   for (const c of clipsOf(nd.name)) {
@@ -144,7 +162,24 @@ for (const nd of figNodes.filter(nd => /^Fig_Din/.test(nd.name))) {
     if (Math.abs(r - Math.round(r)) > 1e-3) throw new Error(`${c} is ${len}s, not whole phases of ${DINNER_META.phase}s`);
   }
   if (DINNER_META.at + DINNER_META.len > clipLen(`${nd.name}Dinner`) - 1) throw new Error("linger window past the dinner clip");
+  if (Math.abs(clipLen(`${nd.name}Dinner`) - DINNER_META.dinner) > 1e-3) throw new Error(`${nd.name}Dinner is not the dinner meta length`);
 }
+// The finale: every Show clip spans it exactly, every Show/After clip is a
+// whole number of phases, and it ends where the dinner clip does.
+if (DINNER_META.finale % DINNER_META.phase || DINNER_META.dinner % DINNER_META.phase) throw new Error("finale not on the phase");
+for (const nd of figNodes.filter(nd => !/^Fig_Din/.test(nd.name))) {
+  for (const c of clipsOf(nd.name).slice(1)) {
+    const len = clipLen(c), r = len / DINNER_META.phase;
+    if (Math.abs(r - Math.round(r)) > 1e-3) throw new Error(`${c} is ${len}s, not whole phases`);
+    if (c.endsWith("Show") && Math.abs(len - (DINNER_META.dinner - DINNER_META.finale)) > 1e-3) {
+      throw new Error(`${c} is ${len}s, not the finale's ${DINNER_META.dinner - DINNER_META.finale}s`);
+    }
+  }
+}
+const showCount = figNodes.filter(nd => animNames.has(`${nd.name}Show`)).length;
+const afterCount = figNodes.filter(nd => animNames.has(`${nd.name}After`)).length;
+console.log(`finale: ${showCount} regulars with a Show clip, ${afterCount} with an After clip`);
+if (showCount !== 15 || afterCount !== 15) throw new Error(`expected 15 Show and 15 After regulars, got ${showCount}/${afterCount}`);
 if (Math.abs(clipLen("Fig_BmLoop") - DINNER_META.phase) > 1e-3) throw new Error(`Rovers loop is not the dinner phase`);
 const barLens = ["Fig_Bm", "Fig_BarA", "Fig_BarB", "Fig_BarC"].map(nm => clipLen(`${nm}Loop`));
 if (barLens.some(len => Math.abs(len - barLens[0]) > 1e-4)) throw new Error(`bar group clip lengths differ: ${barLens}`);

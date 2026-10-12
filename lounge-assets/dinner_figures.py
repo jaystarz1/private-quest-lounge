@@ -179,24 +179,31 @@ GUEST_SPEED = 0.95
 # the Gents or the Ladies on the party wall once a loop.
 #
 # Phase: the Rovers regulars loop on server time modulo rovers_figures.LOOP
-# (PHASE). The client skips part of the LINGER window (cross-fading 2 s) so the
-# dinner clip always ends on a PHASE boundary; with the clip padded to a whole
-# number of PHASEs, clip time after the window equals the regulars' time
-# modulo PHASE, and so does lounge time (LOUNGE_LOOP is a multiple of PHASE).
+# (PHASE). The client starts every session at the last server-time multiple of
+# PHASE before the first visitor arrived, so dinner time is the regulars' time
+# modulo PHASE from the first second; with the clip padded to a whole number
+# of PHASEs, so is lounge time (LOUNGE_LOOP is a multiple of PHASE). LINGER is
+# just the party lingering over the sweet wine now (nothing is cut).
 # That is what lets the scheduler keep this party out of the regulars' way.
 LINGER = 360.0
 PHASE = 360.0
 LA_TARGET = 2530.0                           # pudding cleared (the old dinner's pace)
-LOUNGE_LOOP = 1440.0                          # 24 min: the café mime's three acts and three rests
+LOUNGE_LOOP = 1440.0                          # 24 min: the café mime's round of numbers
 LOUNGE_DRINK = {1: "red", 2: "white", 5: "red", 4: "whisky", 6: "whisky", 8: "whisky"}
 LOUNGE_POUR = {"red": 0.58, "white": 0.62, "whisky": 0.55}
 SERVES = {"W1": (1, 2, 4), "W2": (5, 6, 8)}  # whose drinks each waiter carries over (their side of the table)
-ROUNDS = {"W1": [(80.0, "red", (1, 5)), (100.0, "white", (2,)), (440.0, "red", (1, 5)), (460.0, "white", (2,))],
-          "W2": [(260.0, "whisky", (4, 6, 8)), (620.0, "whisky", (4, 6, 8))]}
-WC_PLAN = [(4, 15.0), (6, 40.0), (1, 150.0), (5, 290.0), (8, 410.0), (2, 520.0)]
-# (the 12-minute pattern twice over the 24-minute loop)
-ROUNDS = {w: r + [(t + 720.0, wn, ks) for t, wn, ks in r] for w, r in ROUNDS.items()}
-WC_PLAN = WC_PLAN + [(k, t + 720.0) for k, t in WC_PLAN]
+# The lounge loop is four of the café mime's rounds (CF.CYCLE); in each the
+# party get up and stand round him on the Rovers' floor (GATHER, from just
+# before rovers_figures.SHOW["pub"]), so the top-ups and the trips to the loo
+# fall between those spells. The last rounds come late in the loop (nobody
+# sips after their last top-up, which keeps the glasses level at the seam).
+RW_ROUNDS = [(8.0, "red", (1, 5)), (58.0, "white", (2,)), (245.0, "whisky", (4, 6, 8)), (600.0, "red", (1, 5)),
+             (650.0, "white", (2,)), (960.0, "whisky", (4, 6, 8)), (1318.0, "red", (1, 5)), (1366.0, "white", (2,))]
+WC_LOUNGE = [(4, 10.0), (1, 300.0), (5, 315.0), (2, 335.0), (6, 670.0), (8, 690.0), (2, 1000.0), (1, 1040.0)]
+GATHER_LEAD = 4.0                            # the first one up as he comes in (this long before his act)
+GATHER_STAY = 6.0                            # they stay on after his bow while he goes out round them
+GATHER_ORDER = (4, 8, 2, 6, 1, 5)            # out of the snug in this order, to the far end of the arc first
+GATHER_Y = -12.40                            # their way along the floor, clear of the hall line
 RV_FLOOR = 0.10                              # ground balcony and pub floor (the house is at 0)
 STEP_Y = -3.70                               # on the way south, where the floor steps up to it
 SNUG_X = 6.45                                # bench cushion centres (build-penthouse BanqE, 4 cushions)
@@ -223,9 +230,9 @@ SNUG_IN = (4.25, GAP_Y)
 # on the counter top (z 1.06), where each stands to reach them and waits
 # between rounds, looking out over the room.
 BAR_Z = 1.06
-PUB_STN = {"W1": (4.75, -13.92), "W2": (5.55, -13.92)}
-PUB_POST = {"W1": (4.75, -13.92, 10.0), "W2": (5.55, -13.92, -25.0)}
-PUB_TRAY = {"W1": Vector((4.80, -14.47, BAR_Z)), "W2": Vector((5.55, -14.47, BAR_Z))}
+PUB_STN = {"RW": (4.75, -13.92)}
+PUB_POST = {"RW": (4.75, -13.92, 10.0)}
+PUB_TRAY = {"RW": Vector((4.80, -14.47, BAR_Z))}
 PUB_BOTTLE = {"red": Vector((4.55, -14.40, BAR_Z)), "white": Vector((4.98, -14.40, BAR_Z)),
               "whisky": Vector((5.80, -14.40, BAR_Z))}
 BOTTLE_STN = {"red": "W1", "white": "W1", "whisky": "W2"}
@@ -234,7 +241,56 @@ SERVE_AT = {1: (STRIP_X, -11.85), 2: (STRIP_X, -12.52), 4: (4.70, -12.55),
             5: (STRIP_X, -13.25), 6: (STRIP_X, -12.78), 8: (4.70, -12.75)}
 
 
+# The Rovers' second barmaid (on the dinner party's clock, so she can serve
+# them): works the end of the bar where the party's bottles stand. The dinner
+# waiters never set foot in the pub; once the party has gone over, they and the
+# chef have a glass of red in the kitchen, standing together north of the
+# island (the chef breaks off for the café's espresso rounds). Their glasses
+# and the bottle wait all dinner on the island's north leg, out of service.
+RW_TAG = "DinRovW"
+RW_LOOK = dict(sex="f", skin="e6b391", hair="2e1d14", hair_style="long", top="f2efe8", vest="1f3b2c",
+               legs="1e1e24", skirt="1e1e24", sleeves="rolled", lips="a8454b", earrings="d8b450", cloth=True)
+UNDER_BAR = Vector((0.12, 0.30, 0.62))       # her hand down to the glass shelf under the counter
+# Between rounds she is never idle: the café couple's espressos (out along the
+# balcony to the café counter: the chef stays in the kitchen), the snug's
+# tables wiped down while it is empty, the bar top wiped with her towel.
+RW_DINNER = [(300.0, "coffee"), (620.0, "wipe"), (900.0, "coffee"), (1150.0, "wipe"), (1500.0, "coffee"),
+             (1800.0, "wipe"), (2100.0, "coffee"), (2420.0, "wipe"), (2650.0, "coffee")]
+# The finale (cafe_figures): the party come out of the snug and stand round the
+# café couple's table in front of the stage, the far ones first (each: their
+# spot, the way past the others to it).
+FINALE_STAND = {4: ((-3.20, -12.45), [(-1.40, -12.85), (-3.05, -12.85)]),
+                8: ((-2.80, -12.88), [(-1.40, -12.88)]),
+                2: ((-2.30, -12.85), [(-1.40, -12.85)]),
+                6: ((-1.75, -12.72), []),
+                1: ((-1.30, -12.30), []),
+                5: ((-1.02, -11.82), [])}
+# The Rovers barmaid at the café couple's table (beside it, east), the way
+# there from her end of the bar along the hall line.
+RW_AT_CAB = (-1.86, -11.72)
+CAFE_LEAVE = 2990.0                                  # the café couple get up no earlier (the mime has left the café)
+RW_TO_CAB = [(3.90, HALL_Y), (0.30, HALL_Y), (-1.10, -12.55), RW_AT_CAB]
+POLISH_SPOT = Vector((5.12, -14.28, BAR_Z))           # the glass she polishes between jobs, on the bar
+RW_COUPLE_TOPUPS = (420.0, 1130.0)                   # the lounge loop: their glasses topped up
+RW_COFFEE = (320.0, 1040.0)                  # the lounge loop's espressos (an even number: the same cups at the seam)
+KIT_C = (9.85, 1.40)                         # the three of them stand round this
+KIT_SPOT = {"W1": (9.85, 1.85), "W2": (9.46, 1.17), "chef": (10.24, 1.17)}
+KIT_GLASS = {"W1": Vector((8.80, 0.25, 0.89)), "W2": Vector((8.80, 0.08, 0.89)), "chef": Vector((8.80, -0.09, 0.89))}
+KIT_BOTTLE = Vector((8.82, 0.40, 0.89))
+KIT_AT_X = 9.28                              # where one stands, facing west, to reach them
+KIT_FACE = 90.0
+KIT_WEST = [(7.62, -2.95), (7.62, 0.70), (9.20, 0.70)]    # from the kitchen's back line round the island's west end
+KIT_POUR = 0.55
+
+
+def kit_spot(who):
+    x, y = KIT_SPOT[who]
+    return (x, y, heading((x, y), KIT_C))
+
+
 def floor_z(x, y):
+    if y < -9.9:
+        return RF.stage_z(x, y)                  # the Rovers (its stage and the stage's step)
     return RV_FLOOR if y < STEP_Y else FLOOR
 
 
@@ -270,7 +326,8 @@ def house_way(a):
 
 def to_wc(k):
     d = WC_DOOR[LOOKS[k]["sex"]]
-    return [SNUG_IN, (3.90, HALL_Y), (-2.75, HALL_Y), (-3.15, d)], (-4.05, d)
+    door = "G" if LOOKS[k]["sex"] == "m" else "L"
+    return [SNUG_IN, (3.90, HALL_Y)] + RF.DOOR_VIA[door] + [RF.DOOR_IN[door]], (-4.05, d)
 
 
 ARRIVE_T0, ARRIVE_GAP = 75.0, 1.8            # moving as a group: about 1.7 m apart
@@ -325,7 +382,8 @@ CHEF_TAG = "DinChef"
 HAND_REST = {"L": Vector((-0.17, 0.06, 0.87)), "R": Vector((0.17, 0.06, 0.87))}
 HAND_CARRY = {"plate": {"L": Vector((-0.17, 0.30, 1.03)), "R": Vector((0.17, 0.30, 1.03))},
               "tray": {"L": Vector((-0.10, 0.28, 1.10))},
-              "bottle": {"R": Vector((0.16, 0.24, 1.00))}}
+              "bottle": {"R": Vector((0.16, 0.24, 1.00))},
+              "drink": {"R": Vector((0.15, 0.24, 1.12))}}
 TRAY_CENTRE = Vector((-0.06, 0.39, 1.09))   # tray centre (local) when carried on the left palm
 TRAY_DROP = 0.15                             # lowered to a seated guest
 TRAY_LOW = Vector((-0.10, 0.30, 1.10 - TRAY_DROP))
@@ -736,6 +794,16 @@ class PropSet:
             for kind in ("fork", "knife", "spoon"):
                 self.cutlery[(kind, k)] = self.add(Prop(f"{kind}{k}", "cutlery", kind))
         self.chairs = {k: self.add(Prop(f"Chair{k}", "chair")) for k in range(1, 9)}
+        self.trays["RW"] = self.add(Prop("TrayRW", "tray"))
+        self.kit = {}                       # the staff's glasses of red, waiting on the island all dinner
+        for who in ("W1", "W2", "chef"):
+            g = self.add(Prop(f"Kred{who}", "glass", ("liquid", "red")))
+            g.fill0 = 0.0
+            g.grip = GLASS_GRIP["red"]
+            self.kit[who] = g
+        kb = self.add(Prop("BredKit", "bottle", "red"))
+        kb.grip = 0.11
+        self.bottles[("red", "Kit")] = kb
         for w in ("W1", "W2"):
             self.trays[w] = self.add(Prop(f"Tray{w}", "tray"))
             for wn in WINES + ("cognac", "whisky"):
@@ -748,6 +816,9 @@ class PropSet:
             b.grip = 0.11
             self.bottles[(wn, "Pub")] = b
         CF.add_props(self)                  # the café: cups, the chef's café tray, the mime's red
+        self.polish = self.add(Prop("Lpolish", "glass", ("liquid", "whisky")))
+        self.polish.fill0 = 0.0
+        self.polish.grip = GLASS_GRIP["whisky"]
         self.lounge = {}                    # each guest's after-dinner glass
         for k in GUESTS:
             wn = LOUNGE_DRINK[k]
@@ -935,6 +1006,7 @@ class Guest:
         self.lounge_t = None
         self.vis_keys = f.vis
         self.walks = []                     # (t0, t1) on their feet in the pub (out to the loo and back)
+        self.watch = []                     # (t0, t1) standing round the mime on the Rovers' floor
         self.pub = []                       # (t0, t1) seated in the snug
         self.away = []                      # (t0, t1) out of sight in the loo
         self.drink = False                  # holding the after-dinner drink
@@ -1227,7 +1299,8 @@ class Guest:
         self.over.append((t, t + 0.9, 0.0, 12, 22, 2))
         self.over.append((t + 0.9, t1 + 0.6, 0.0, 6, -2, 2))
         self.x, self.y, self.yaw = rx, ry, yaw
-        self.pub.append((t1, LOOP))
+        self.pub.append((t1, getattr(self, "_resume", LOOP)))
+        self._resume = LOOP
         return t1 + 0.6
 
     def pub_stand(self, t):
@@ -1235,8 +1308,9 @@ class Guest:
         f, pb = self.f, PUB[self.k]
         yaw = pb["yaw"]
         (fx, fy), (rx, ry) = pb["front"], pb["root"]
-        p0, _p1 = self.pub[-1]
-        self.pub[-1] = (p0, t)
+        i = next(j for j, (a, b) in enumerate(self.pub) if a <= t < b)
+        p0, self._resume = self.pub[i]
+        self.pub[i] = (p0, t)
         f.put(t, rx, ry, yaw)
         f.zk.add(t, pb["z"])
         f.fL.add(t, Vector(pb["feet"][0]))
@@ -1306,6 +1380,46 @@ class Guest:
         self.mark("L", t0, t)
         self.mark("R", t0, t)
         self.tasks.append((t0, t, "wc"))
+        return t
+
+    def gather(self, t, spot, look, t_bow, t_until, via=()):
+        """Up out of the snug with the drink, along the floor (via: past the
+        others) to a place round the mime's audience, watching him; a cheer
+        (glass up, a wave) at each of his bows (t_bow: one or a list, the
+        last the biggest); back to the seat after it."""
+        pb = PUB[self.k]
+        f = self.f
+        t0 = t
+        self.stay(t)
+        t = self.pub_stand(t)
+        snug = [pb["front"], (STRIP_X, GAP_Y)] if pb["kind"] == "bench" else [pb["front"]]
+        way = snug + [SNUG_IN, (3.90, GATHER_Y), (0.40, GATHER_Y)] + list(via) + [spot]
+        w0 = t
+        t = self.walk(t, way)
+        t = self.face(t, look)
+        self.patio.append((t, t_until))
+        self.watch.append((t, t_until))
+        bows = list(t_bow) if isinstance(t_bow, (list, tuple)) else [t_bow]
+        for q_b, tb in enumerate(bows):
+            tb = max(t + 0.5, tb)
+            n = 6 if q_b == len(bows) - 1 and len(bows) > 1 else 3
+            f.R.hold(tb).add(tb + 0.6, Vector((0.12, 0.40, 1.42))).add(tb + 2.2, Vector((0.12, 0.40, 1.42))) \
+                .add(tb + 2.9, FLUTE_STAND.copy())
+            f.L.hold(tb).add(tb + 1.0, Vector((-0.24, 0.26, 1.62)))
+            for q in range(n):
+                f.L.add(tb + 1.2 + q * 0.4, Vector((-0.30, 0.24, 1.66))).add(tb + 1.4 + q * 0.4,
+                                                                             Vector((-0.22, 0.27, 1.62)))
+            f.L.add(tb + 2.4 + 0.4 * n, STAND_REST["L"].copy())
+            self.over.append((tb, tb + 2.6, None, -8, 0, 3))
+        t = max(t, t_until)
+        self.stay(t)
+        t = self.walk(t, list(reversed(way)))
+        self.walks.append((w0, t))
+        t = self.pub_sit(t)
+        self.walks[-1] = (w0 - 6.0, t)
+        self.mark("L", t0, t)
+        self.mark("R", t0, t)
+        self.tasks.append((t0, t, "gather"))
         return t
 
     def out_of_seat(self, t):
@@ -1695,11 +1809,13 @@ class Crew:
         self.rng = random.Random("dinner")
         self.guests = {k: Guest(k, random.Random(f"guest{k}")) for k in GUESTS}
         self.W = {w: Staff(WAITER_TAG[w], WAITER_LOOK[w], STANDBY[w]) for w in ("W1", "W2")}
+        self.W["RW"] = Staff(RW_TAG, RW_LOOK, PUB_POST["RW"], z=RV_FLOOR)
         self.chef = Staff(CHEF_TAG, CHEF_LOOK, CHEF_START, speed=1.15)
-        self.n_task = {"W1": 0, "W2": 0, "chef": 0, **{f"G{k}": 0 for k in GUESTS}}
+        self.n_task = {"W1": 0, "W2": 0, "RW": 0, "chef": 0, "CA": 0, "CB": 0, **{f"G{k}": 0 for k in GUESTS}}
         self.glass_on = {k: [] for k in range(1, 9)}        # (t0, t1, wine) glass on the table
-        self.rovers_from = 1e9                               # set once the linger window is known
-        CF.add_actors(self, CF.DINNER_DUE)
+        self.rovers_from = 0.0                               # (every session starts on the regulars' beat)
+        self.last_pour = {}
+        CF.add_actors(self, [])                 # (the café's espressos are the Rovers barmaid's now)
 
     def delay(self, who):
         i = self.n_task[who]
@@ -1791,10 +1907,9 @@ class Crew:
         return t
 
     def pub_go(self, w, t, dest, face=None):
-        """Walk about the snug, round the other waiter's post."""
+        """Walk about the snug."""
         s = self.W[w]
-        o = PUB_POST["W2" if w == "W1" else "W1"]
-        t = s.walk(t, snug_path((s.x, s.y), dest[:2], [(o[0], o[1], 0.46)]))
+        t = s.walk(t, snug_path((s.x, s.y), dest[:2]))
         return s.turn(t, face) if face is not None else t
 
     def pub_serve(self, w, t_avail, there):
@@ -1842,13 +1957,13 @@ class Crew:
         t0 = t_avail + d
         P = self.P
         for k in ks:                                  # nobody served while they're up
-            for a, b in self.guests[k].walks:
-                if a - 25.0 < t0 < b + 2.0:
+            for a, b in sorted(self.guests[k].walks):
+                if a - (12.0 + 16.0 * len(ks)) < t0 < b + 2.0:
                     t0 = b + 2.0
         s.stay(t0)
         b = P.bottles[(wine, "Pub")]
         spot = PUB_BOTTLE[wine]
-        t = self.pub_go(w, t0, PUB_STN[w], 180.0)
+        t = self.pub_go(w, t0, (spot.x, PUB_STN[w][1]), 180.0)
         tc = s.take(t, "R", b, spot, "bottle", lift=b.grip, reach=0.05)
         s.hold["R"] = "bottle"
         t = s.back(tc + 0.1, "R", 0.5)
@@ -1874,24 +1989,405 @@ class Crew:
             glass.ramp(t + 0.5, t + 1.7, LOUNGE_POUR[wine])
             self.last_pour[k] = t + 1.7
             t = s.back(t + 2.3, "R", 0.6)
-        t = self.pub_go(w, t, PUB_STN[w], 180.0)
+        t = self.pub_go(w, t, (spot.x, PUB_STN[w][1]), 180.0)
         tc = s.put_down(t, "R", b, spot, 180.0, lift=b.grip, reach=0.05, how="bottle")
+        t = self.pub_go(w, tc + 0.6, PUB_STN[w], 180.0)
         t = s.back(tc + 0.1, "R", 0.5)
         t = s.turn(t + 0.2, PUB_POST[w][2])
         s.tasks.append((t0, t, f"pub {wine}"))
         s.t = t
         return t
 
-    def post_idle(self, w, t0, t1):
-        """At the end of the bar between jobs: looks round the room."""
+    def rw_round(self, t_avail, ks, there):
+        """The Rovers barmaid: glasses up from under the bar onto her tray, each
+        poured from the party's bottle, carried over and handed to each of ks in
+        the snug (tray lowered to them), the tray back on the bar."""
+        w = "RW"
         s = self.W[w]
-        rng = random.Random(f"post{w}{int(t0)}")
-        t = t0 + rng.uniform(2.0, 5.0)
+        d, i = self.delay(w)
+        t0 = t_avail + d
+        s.stay(t0)
+        P = self.P
+        tray = P.trays[w]
+        t = self.pub_go(w, t0, PUB_STN[w], 180.0)
+        rot = Matrix.Rotation(math.pi, 3, 'Z')
+        slot_w = {j: PUB_TRAY[w] + rot @ TRAY_SLOTS[j] for j in range(len(ks))}
+        for j, k in enumerate(ks):
+            g = P.lounge[k]
+            t = s.reach(t, "R", UNDER_BAR.copy(), 0.7, 28, 28)
+            g.at(t, ("hand", s.f.tag, "R", "glass"))
+            s.hold["R"] = "glass"
+            tw = slot_w[j]
+            ct = s.contact(t + 0.8, "R", s.f.at_world(Vector((tw.x, tw.y + 0.10, tw.z + g.grip + 0.04))),
+                           lambda R, fi, tw=tw, gr=g.grip: tw + Vector((0, 0, gr)))
+            t = s.reach(t, "R", ct, 0.8, 16, 22)
+            g.at(t, ("on", tray, j))
+            s.hold["R"] = None
+            t = s.back(t + 0.1, "R", 0.5)
+        for wine in dict.fromkeys(LOUNGE_DRINK[k] for k in ks):
+            b = P.bottles[(wine, "Pub")]
+            spot = PUB_BOTTLE[wine]
+            t = self.pub_go(w, t, (spot.x, PUB_STN[w][1]), 180.0)
+            tc = s.take(t, "R", b, spot, "bottle", lift=b.grip, reach=0.05)
+            s.hold["R"] = "bottle"
+            t = s.back(tc + 0.1, "R", 0.5)
+            t = self.pub_go(w, t, PUB_STN[w], 180.0)
+            for j, k in enumerate(ks):
+                if LOUNGE_DRINK[k] != wine:
+                    continue
+                tw = slot_w[j]
+                dv = Vector((tw.x - s.x, tw.y - s.y, 0)).normalized()
+                palm = tw + Vector((0, 0, 0.25)) - dv * 0.19
+                t = s.reach(t, "R", s.f.at_world(palm - dv * 0.045), 0.8, 20, 28, bow=10)
+                b.tilt.add(t - 0.1, 0).add(t + 0.5, -100).add(t + 1.7, -100).add(t + 2.2, 0)
+                P.lounge[k].ramp(t + 0.5, t + 1.7, LOUNGE_POUR[wine])
+                self.last_pour[k] = t + 1.7
+                t = s.back(t + 2.3, "R", 0.5)
+            t = self.pub_go(w, t, (spot.x, PUB_STN[w][1]), 180.0)
+            tc = s.put_down(t, "R", b, spot, 180.0, lift=b.grip, reach=0.05, how="bottle")
+            t = s.back(tc + 0.1, "R", 0.5)
+        t = self.pub_go(w, t, PUB_STN[w], 180.0)
+        tc = s.take(t, "L", tray, PUB_TRAY[w], "tray", lift=0.04, reach=0.105)
+        t = s.back(tc + 0.1, "L", 0.5)
+        for j, k in enumerate(ks):
+            g = self.guests[k]
+            st = SERVE_AT[k]
+            if t < there[k] + 0.5:                   # (wait till they're seated: her spot is beside their seat)
+                s.stay(t)
+                t = there[k] + 0.5
+                s.stay(t)
+            t = self.pub_go(w, t, st)
+            s.stay(t)
+            t = s.face(t, PUB[k]["root"])
+            s.f.L.hold(t).add(t + 0.6, TRAY_LOW.copy())
+            s.f.lean.hold(t).add(t + 0.6, 12)
+            tc = g.take_from_tray(t + 0.7, P.lounge[k], s, j, drop=TRAY_DROP)
+            g.drink = True
+            t = tc + 1.3
+            s.f.L.add(t + 0.5, HAND_CARRY["tray"]["L"].copy())
+            s.f.lean.add(t + 0.5, 3)
+            t += 0.5
+        t = self.pub_go(w, t, PUB_STN[w], 180.0)
+        tc = s.put_down(t, "L", tray, PUB_TRAY[w], 180.0, lift=0.04, reach=0.105, how="tray")
+        t = s.back(tc + 0.1, "L", 0.5)
+        t = s.turn(t + 0.2, PUB_POST[w][2])
+        s.tasks.append((t0, t, "pub round"))
+        s.t = t
+        return t
+
+    def kit_at(self, who):
+        return (KIT_AT_X, KIT_GLASS[who].y)
+
+    def kit_glass(self, who, t_avail, pour=False):
+        """After service, to the west end of the island (with pour: the bottle,
+        a glass of red for each of the three), take one's glass and join the
+        others standing round by the island."""
+        s = self.chef if who == "chef" else self.W[who]
+        d, i = self.delay(who)
+        t0 = t_avail + d
+        s.stay(t0)
+        P = self.P
+        if who == "chef":
+            t = s.walk(t0, [(s.x, s.y)] + KIT_WEST + [self.kit_at(who)])
+        else:
+            t = s.walk(t0, house_way((s.x, s.y))[:-len(HOUSE_SPINE)] + [(8.60, 2.40), self.kit_at(who)])
+        t = s.turn(t, KIT_FACE)
+        if pour:
+            b = P.bottles[("red", "Kit")]
+            t = s.walk(t, [(s.x, s.y), (KIT_AT_X, KIT_BOTTLE.y)])
+            t = s.turn(t, KIT_FACE)
+            tc = s.take(t, "R", b, KIT_BOTTLE, "bottle", lift=b.grip, reach=0.05)
+            s.hold["R"] = "bottle"
+            t = s.back(tc + 0.1, "R", 0.5)
+            t = s.walk(t, [(s.x, s.y), self.kit_at("W2")])
+            t = s.turn(t, KIT_FACE)
+            for wh in ("W1", "W2", "chef"):
+                gp = KIT_GLASS[wh]
+                dv = Vector((gp.x - s.x, gp.y - s.y, 0)).normalized()
+                palm = gp + Vector((0, 0, 0.25)) - dv * 0.19
+                t = s.reach(t, "R", s.f.at_world(palm - dv * 0.045), 0.8, 20, 28, bow=10)
+                b.tilt.add(t - 0.1, 0).add(t + 0.5, -100).add(t + 1.6, -100).add(t + 2.1, 0)
+                P.kit[wh].ramp(t + 0.5, t + 1.6, KIT_POUR)
+                t = s.back(t + 2.2, "R", 0.5)
+            t = s.walk(t, [(s.x, s.y), (KIT_AT_X, KIT_BOTTLE.y)])
+            t = s.turn(t, KIT_FACE)
+            tc = s.put_down(t, "R", b, KIT_BOTTLE, KIT_FACE, lift=b.grip, reach=0.05, how="bottle")
+            t = s.back(tc + 0.1, "R", 0.5)
+            t = s.walk(t, [(s.x, s.y), self.kit_at(who)])
+            t = s.turn(t, KIT_FACE)
+        g = P.kit[who]
+        tc = s.take(t, "R", g, KIT_GLASS[who], "glass", lift=g.grip, reach=0.05)
+        s.hold["R"] = "drink"
+        t = s.back(tc + 0.1, "R", 0.6)
+        x, y, yaw = kit_spot(who)
+        t = s.walk(t, [(s.x, s.y), (x, y)])
+        t = s.turn(t, yaw)
+        s.tasks.append((t0, t, "kitchen drink"))
+        s.t = t
+        return t
+
+    def kit_idle(self, who, t0, t1):
+        """A glass of red with the others after service: sips, a look from one to
+        the other, a word with the free hand, a laugh."""
+        s = self.chef if who == "chef" else self.W[who]
+        f = s.f
+        rng = random.Random(f"kit{who}{int(t0)}")
+        others = [o for o in ("W1", "W2", "chef") if o != who]
+        g = self.P.kit[who]
+        t = t0 + rng.uniform(1.0, 4.0)
         while t < t1 - 6.0:
+            kind = rng.choice(["sip", "look", "look", "talk", "laugh"])
+            if kind == "sip" and t < t1 - 5.0:
+                f.R.hold(t).add(t + 0.9, MOUTH_SIP.copy()).add(t + 2.2, MOUTH_SIP.copy()) \
+                    .add(t + 3.1, HAND_CARRY["drink"]["R"].copy())
+                g.tilt.add(t + 0.7, 0).add(t + 1.2, 45).add(t + 1.9, 45).add(t + 2.4, 0)
+                f.pitch.add(t + 0.9, -12).add(t + 2.2, -12).add(t + 3.1, 3)
+                t += 3.4
+            elif kind == "talk" and t < t1 - 5.0:
+                o = rng.choice(others)
+                rel = ((heading((s.x, s.y), KIT_SPOT[o]) - s.yaw) + 180) % 360 - 180
+                f.yaw.add(t + 0.4, max(-60, min(60, rel)))
+                f.L.add(t, HAND_REST["L"].copy())
+                for q in range(3):
+                    f.L.add(t + 0.7 + q * 0.7, STAND_GESTURE[q % 2].copy())
+                f.L.add(t + 3.0, HAND_REST["L"].copy())
+                f.yaw.add(t + 3.6, max(-60, min(60, rel)))
+                t += 3.8
+            elif kind == "laugh":
+                f.pitch.add(t + 0.4, -14).add(t + 1.4, -4).add(t + 2.0, 3)
+                f.lean.add(t + 0.6, -6).add(t + 2.0, 3)
+                t += 2.4
+            else:
+                o = rng.choice(others)
+                rel = ((heading((s.x, s.y), KIT_SPOT[o]) - s.yaw) + 180) % 360 - 180
+                dur = rng.uniform(2.5, 6.0)
+                f.yaw.add(t + 0.5, max(-60, min(60, rel))).add(t + dur, max(-60, min(60, rel)))
+                f.pitch.add(t + 0.5, rng.choice([2, 4, 6]))
+                t += dur
+            t += rng.uniform(0.6, 2.5)
+        f.yaw.add(t1, 0.0)
+        f.pitch.add(t1, 3.0)
+        f.lean.add(t1, 3.0)
+
+    def rw_wipe(self, t_avail):
+        """The Rovers barmaid wipes down the snug's two tables with her towel
+        (from between them, one then the other)."""
+        w = "RW"
+        s = self.W[w]
+        f = s.f
+        d, i = self.delay(w)
+        t0 = t_avail + d
+        s.stay(t0)
+        t = self.pub_go(w, t0, GAP_STAND)
+        for face in (0.0, 180.0):
+            t = s.turn(t, face)
+            hold_live(f.R, t)
+            f.lean.hold(t).add(t + 0.6, 30)
+            f.pitch.hold(t).add(t + 0.6, 30)
+            f.L.hold(t).add(t + 0.6, Vector((-0.22, 0.30, 0.86)))
+            for q in range(7):
+                f.R.add(t + 0.6 + q * 0.45, Vector((0.02 + 0.14 * (q % 2), 0.44 + 0.03 * (q % 3), 0.81)))
+            t += 0.6 + 7 * 0.45
+            f.R.add(t + 0.6, s.hand_target("R"))
+            f.L.add(t + 0.6, s.hand_target("L"))
+            f.lean.add(t + 0.6, 3)
+            f.pitch.add(t + 0.6, 3)
+            t += 0.8
+        t = self.pub_go(w, t, PUB_STN[w])
+        t = s.turn(t, PUB_POST[w][2])
+        s.tasks.append((t0, t, "wipe"))
+        s.t = t
+        return t
+
+    def post_idle(self, w, t0, t1):
+        """At the end of the bar between jobs, looking out over the room; the
+        Rovers barmaid polishes a glass (up off the bar, polished with her
+        cloth facing the room, set back) in any gap long enough for it."""
+        s = self.W[w]
+        f = s.f
+        rng = random.Random(f"post{w}{int(t0)}")
+        t = t0 + rng.uniform(1.5, 3.0)
+        g = self.P.polish
+        while t < t1 - 6.0:
+            if w == "RW" and t1 - t > 32.0:
+                y0 = s.yaw
+                t = s.turn(t, 180.0, 1.3)
+                tc = s.take(t, "R", g, POLISH_SPOT, "glass", lift=g.grip, reach=0.05, lean=20, dur=1.0)
+                t = s.back(tc + 0.1, "R", 1.0)
+                t = s.turn(t, y0, 1.3)
+                d = min(t1 - t - 9.0, rng.uniform(18.0, 34.0))
+                hold = Vector((0.06, 0.34, 1.10))
+                f.R.add(t + 0.6, hold.copy())
+                q = 0
+                tt = t + 0.9
+                while tt < t + d:                            # the cloth round and round inside it
+                    f.L.add(tt, Vector((0.02 + 0.03 * math.cos(q), 0.36 + 0.02 * math.sin(q), 1.16)))
+                    q += 1.3
+                    tt += 0.28
+                    if q % 9.1 < 1.3:
+                        f.pitch.add(tt, rng.choice([4, 10, 14]))       # a look into it, a look round
+                        f.yaw.add(tt, rng.uniform(-30, 30))
+                f.L.add(t + d + 0.4, s.hand_target("L"))
+                f.yaw.add(t + d, 0)
+                f.pitch.add(t + d, 3)
+                t = s.turn(t + d + 0.5, 180.0, 1.3)
+                tc = s.put_down(t, "R", g, POLISH_SPOT, 180.0, lift=g.grip, reach=0.05, lean=20, dur=1.0,
+                                how="glass")
+                t = s.back(tc + 0.1, "R", 1.0)
+                t = s.turn(t, y0, 1.3)
+                t += rng.uniform(2.0, 5.0)
+                continue
             dur = rng.uniform(2.5, 5.0)
             s.head(t, yaw=rng.uniform(-45, 45), pitch=rng.choice([0, 3, 6]))
             s.head(t + dur, yaw=0)
             t += dur + rng.uniform(3.0, 9.0)
+
+    # The café couple in the Rovers: the Rovers barmaid's customers ----------
+    def rw_couple(self, t_avail):
+        """A glass of wine each for the café couple at their table in front of
+        the stage (white for her, red for him), poured at the bar onto her
+        tray, carried over and set at their places."""
+        w = "RW"
+        s = self.W[w]
+        d, i = self.delay(w)
+        t0 = t_avail + d
+        s.stay(t0)
+        P = self.P
+        tray = P.trays[w]
+        t = self.pub_go(w, t0, PUB_STN[w], 180.0)
+        rot = Matrix.Rotation(math.pi, 3, 'Z')
+        order = (("A", "white"), ("B", "red"))
+        slot_w = {j: PUB_TRAY[w] + rot @ TRAY_SLOTS[j] for j in range(2)}
+        for j, (who, wn) in enumerate(order):
+            g = P.cafe_wine[who]
+            t = s.reach(t, "R", UNDER_BAR.copy(), 0.7, 28, 28)
+            g.at(t, ("hand", s.f.tag, "R", "glass"))
+            s.hold["R"] = "glass"
+            tw = slot_w[j]
+            ct = s.contact(t + 0.8, "R", s.f.at_world(Vector((tw.x, tw.y + 0.10, tw.z + g.grip + 0.04))),
+                           lambda R, fi, tw=tw, gr=g.grip: tw + Vector((0, 0, gr)))
+            t = s.reach(t, "R", ct, 0.8, 16, 22)
+            g.at(t, ("on", tray, j))
+            s.hold["R"] = None
+            t = s.back(t + 0.1, "R", 0.5)
+        for j, (who, wn) in enumerate(order):
+            b = P.bottles[(wn, "Pub")]
+            spot = PUB_BOTTLE[wn]
+            t = self.pub_go(w, t, (spot.x, PUB_STN[w][1]), 180.0)
+            tc = s.take(t, "R", b, spot, "bottle", lift=b.grip, reach=0.05)
+            s.hold["R"] = "bottle"
+            t = s.back(tc + 0.1, "R", 0.5)
+            t = self.pub_go(w, t, PUB_STN[w], 180.0)
+            tw = slot_w[j]
+            dv = Vector((tw.x - s.x, tw.y - s.y, 0)).normalized()
+            palm = tw + Vector((0, 0, 0.25)) - dv * 0.19
+            t = s.reach(t, "R", s.f.at_world(palm - dv * 0.045), 0.8, 20, 28, bow=10)
+            b.tilt.add(t - 0.1, 0).add(t + 0.5, -100).add(t + 1.7, -100).add(t + 2.2, 0)
+            P.cafe_wine[who].ramp(t + 0.5, t + 1.7, LOUNGE_POUR[wn])
+            t = s.back(t + 2.3, "R", 0.5)
+            t = self.pub_go(w, t, (spot.x, PUB_STN[w][1]), 180.0)
+            tc = s.put_down(t, "R", b, spot, 180.0, lift=b.grip, reach=0.05, how="bottle")
+            t = s.back(tc + 0.1, "R", 0.5)
+        t = self.pub_go(w, t, PUB_STN[w], 180.0)
+        tc = s.take(t, "L", tray, PUB_TRAY[w], "tray", lift=0.04, reach=0.105)
+        t = s.back(tc + 0.1, "L", 0.5)
+        t = self.pub_go(w, t, RW_TO_CAB[0])                  # (round the snug's stools)
+        t = s.walk(t, [(s.x, s.y)] + RW_TO_CAB[1:])
+        t = s.face(t, RF.CAB_TABLE)
+        at = t
+        for j, (who, wn) in enumerate(order):
+            g = P.cafe_wine[who]
+            t = s.reach(t + 0.1, "R", s.contact(t + 0.6, "R", TRAY_CENTRE + TRAY_SLOTS[j] + Vector((0, -0.05, g.grip)),
+                                                palm_on_tray(j, g.grip)), 0.5, 18)
+            g.at(t, ("hand", s.f.tag, "R", "glass"))
+            s.hold["R"] = "glass"
+            spot = CF.WINE_SPOT[who]
+            tc = s.put_down(t + 0.1, "R", g, spot, s.yaw, lift=g.grip, reach=0.05, lean=24, dur=0.9, bow=16,
+                            how="glass")
+            self.couple[who].wine = (tc, LOOP)
+            t = s.back(tc + 0.1, "R", 0.6)
+        for who in ("A", "B"):
+            self.couple[who].served.append((at, t, (s.x, s.y)))
+        t = s.walk(t, list(reversed(RW_TO_CAB)))
+        t = self.pub_go(w, t, PUB_STN[w])
+        tc = s.put_down(s.turn(t, 180.0), "L", tray, PUB_TRAY[w], 180.0, lift=0.04, reach=0.105, how="tray")
+        t = s.back(tc + 0.1, "L", 0.5)
+        t = s.turn(t + 0.2, PUB_POST[w][2])
+        s.tasks.append((t0, t, "couple wine"))
+        s.t = t
+        return t
+
+    def rw_couple_topup(self, t_avail, who):
+        """The bottle over to their table and the glass at who's place topped up."""
+        w = "RW"
+        s = self.W[w]
+        d, i = self.delay(w)
+        t0 = t_avail + d
+        s.stay(t0)
+        P = self.P
+        wn = "white" if who == "A" else "red"
+        b = P.bottles[(wn, "Pub")]
+        spot = PUB_BOTTLE[wn]
+        t = self.pub_go(w, t0, (spot.x, PUB_STN[w][1]), 180.0)
+        tc = s.take(t, "R", b, spot, "bottle", lift=b.grip, reach=0.05)
+        s.hold["R"] = "bottle"
+        t = s.back(tc + 0.1, "R", 0.5)
+        t = self.pub_go(w, t, RW_TO_CAB[0])
+        t = s.walk(t, [(s.x, s.y)] + RW_TO_CAB[1:])
+        gp = CF.WINE_SPOT[who]
+        t = s.face(t, gp)
+        at = t
+        d2 = Vector((gp.x - s.x, gp.y - s.y, 0)).normalized()
+        palm = gp + Vector((0, 0, 0.25)) - d2 * 0.19
+        t = s.reach(t, "R", s.f.at_world(palm - d2 * 0.045), 0.8, 22, 28, bow=14)
+        b.tilt.add(t - 0.1, 0).add(t + 0.5, -100).add(t + 1.9, -100).add(t + 2.4, 0)
+        P.cafe_wine[who].ramp(t + 0.5, t + 1.9, LOUNGE_POUR[wn])
+        t = s.back(t + 2.5, "R", 0.6)
+        self.couple[who].served.append((at, t, (s.x, s.y)))
+        self.couple[who].busy.append((at - 1.0, t + 0.5))
+        t = s.walk(t, list(reversed(RW_TO_CAB)))
+        t = self.pub_go(w, t, (spot.x, PUB_STN[w][1]))
+        t = s.turn(t, 180.0)
+        tc = s.put_down(t, "R", b, spot, 180.0, lift=b.grip, reach=0.05, how="bottle")
+        t = s.back(tc + 0.1, "R", 0.5)
+        t = self.pub_go(w, t, PUB_STN[w], PUB_POST[w][2])
+        s.tasks.append((t0, t, f"couple {wn}"))
+        s.t = t
+        return t
+
+    def rw_watch(self, t0, t1, bows, big):
+        """The finale: at her end of the bar, turned round to the stage,
+        applauding each of his bows."""
+        w = "RW"
+        s = self.W[w]
+        f = s.f
+        t = max(t0, s.t)
+        s.stay(t)
+        t = self.pub_go(w, t, PUB_STN[w])
+        t = s.turn(t, heading(PUB_STN[w], RF.MIME_PUB))
+        rng = random.Random("rw-finale")
+        tt = t + 1.0
+        while tt < t1 - 2.0:
+            dd = min(rng.uniform(3.0, 6.0), t1 - 2.0 - tt)
+            f.yaw.add(tt, rng.uniform(-6, 6)).add(tt + dd - 0.4, rng.uniform(-6, 6))
+            f.pitch.add(tt + 0.3, rng.choice([-8, -4, 0]))
+            tt += dd
+        for tb in bows:
+            n = 14 if tb == big else 6
+            f.L.hold(tb - 0.6)
+            f.R.hold(tb - 0.6)
+            for q in range(n):
+                tq = tb + q * 0.3
+                f.L.add(tq, Vector((-0.07, 0.30, 1.22))).add(tq + 0.15, Vector((-0.025, 0.30, 1.22)))
+                f.R.add(tq, Vector((0.07, 0.30, 1.22))).add(tq + 0.15, Vector((0.025, 0.30, 1.22)))
+            f.L.add(tb + 0.3 * n + 0.6, s.hand_target("L"))
+            f.R.add(tb + 0.3 * n + 0.6, s.hand_target("R"))
+        f.yaw.add(t1, 0)
+        f.pitch.add(t1, 3)
+        t = s.turn(t1 + 0.2, PUB_POST[w][2])
+        s.tasks.append((t0, t, "finale"))
+        s.t = t
+        return t
 
     def standby(self, w, t):
         s = self.W[w]
@@ -2197,6 +2693,11 @@ def author(delays, eat_scale):
         P.lounge[k].at(0.0, ("hidden",))
     for wn, spot in PUB_BOTTLE.items():
         P.bottles[(wn, "Pub")].at(0.0, ("spot", spot.copy(), 180.0))
+    P.trays["RW"].at(0.0, ("spot", PUB_TRAY["RW"].copy(), 180.0))
+    P.polish.at(0.0, ("spot", POLISH_SPOT.copy(), 180.0))
+    for who, g in P.kit.items():                         # the staff's glasses, waiting on the island
+        g.at(0.0, ("spot", KIT_GLASS[who].copy(), KIT_FACE))
+    P.bottles[("red", "Kit")].at(0.0, ("spot", KIT_BOTTLE.copy(), KIT_FACE))
     CF.initial_props(P)
     for k in GUESTS:
         pl = PLACES[k]
@@ -2249,8 +2750,7 @@ def author(delays, eat_scale):
                     t = cr.pour(w, t + 1.0, "white", POUR["white"], whites)
             if c == 6:
                 t = cr.pour(w, t + 1.0, "sweet", POUR["sweet"])
-                t = cr.glass_change(w, t + 1.0, "white", None,                # the white glasses go;
-                                    [P.lounge[k] for k in SERVES[w]])           # the drinks for the pub
+                t = cr.glass_change(w, t + 1.0, "white", None, None)         # the white glasses go
             if c == 1:
                 t = cr.glass_change(w, max(t, e0 + 4.0), "champ", "white", "red")
             if c == 3:
@@ -2286,8 +2786,8 @@ def author(delays, eat_scale):
     cr.chef_idle(cr.chef.t, La)
     La = max(La, cr.chef.t + 1.0)
     cr.La = La
-    cr.rovers_from = La + LINGER
-    cr.chef_idle(La, La + LINGER, static=True)
+    cr.rovers_from = 0.0                       # (the client starts every session on the regulars' beat)
+    cr.chef_idle(La, La + LINGER)
     t_up = La + LINGER + 3.0
     cr.t_first_up = t_up
     there = {}
@@ -2298,15 +2798,54 @@ def author(delays, eat_scale):
             if rec[1] is None:
                 cr.glass_on[k][j] = (rec[0], t_k, rec[2])
         there[k] = cr.guests[k].to_pub(t_k, P)
-    for w, lag in (("W1", 8.0), ("W2", 4.0)):
-        cr.pub_serve(w, t_up + lag, there)
-    end = max(list(there.values()) + [cr.W["W1"].t, cr.W["W2"].t]) + 20.0
-    cr.D = math.ceil(end / PHASE) * PHASE
-    for w in ("W1", "W2"):
-        cr.post_idle(w, cr.W[w].t, cr.D)
-    cr.chef_idle(cr.chef.t, cr.D - 3.0)
-    if (cr.chef.x, cr.chef.y) != C_STOVE[:2] or cr.chef.t > cr.D - 0.5:
-        raise RuntimeError("chef not back at the stove when the dinner ends")
+    # The Rovers barmaid brings their first drinks over, a table at a time;
+    # the waiters and the chef pour themselves a glass in the kitchen.
+    for t_j, job in RW_DINNER:                       # the Rovers barmaid before the party come over
+        if job == "coffee":
+            CF.coffee_run(cr, max(cr.W["RW"].t, t_j), "RW")
+        else:
+            cr.rw_wipe(max(cr.W["RW"].t, t_j))
+    t_rw = cr.rw_round(max(cr.W["RW"].t, t_up + 10.0), (2, 1, 4), there)
+    cr.rw_round(t_rw + 2.0, (6, 5, 8), there)
+    # The café couple come over once the party is in (and the mime has left
+    # the café for the last time), to their table in front of the stage; the
+    # Rovers barmaid brings them a glass of wine each.
+    t_c = max(max(there.values()) + 5.0, CAFE_LEAVE)
+    for who, gap in (("A", 0.0), ("B", 1.8)):
+        d, _ = cr.delay("C" + who)
+        cr.couple[who].to_rovers(t_c + gap + d)
+    seated = max(cr.couple[w].rovers[0] for w in "AB")
+    cr.rw_couple(max(cr.W["RW"].t, seated + 4.0))
+    # The finale: the party come out and stand round the couple's table, the
+    # barmaid turns round to the stage; after it, the couple's glasses topped up.
+    F0 = RF.FINALE_AT
+    bows = [F0 + b for b in RF.FINALE_BOWS]
+    for i, k in enumerate(GATHER_ORDER):
+        d, _ = cr.delay(f"G{k}")
+        spot, via = FINALE_STAND[k]
+        cr.guests[k].gather(F0 + 2.4 * i + d, spot, RF.MIME_PUB, bows,
+                            F0 + RF.FINALE_WATCH[1] + 2.4 * (len(GATHER_ORDER) - 1 - i), via)
+    cr.rw_watch(F0 + RF.FINALE_WATCH[0] - 2.0, F0 + RF.FINALE_WATCH[1], bows, bows[-1])
+    t_x = cr.rw_couple_topup(max(cr.W["RW"].t, F0 + RF.FINALE_WATCH[1] + 30.0), "B")
+    cr.rw_couple_topup(t_x + 2.0, "A")
+    t_k = cr.kit_glass("W1", max(cr.W["W1"].t, there[PUB_ORDER[-1]] - 25.0), pour=True)
+    cr.chef_idle(cr.chef.t, t_k + 4.0)
+    cr.kit_glass("W2", max(cr.W["W2"].t, t_k + 1.0))
+    cr.kit_glass("chef", max(cr.chef.t, cr.W["W2"].t + 1.0))
+    end = max(list(there.values()) + [cr.W["RW"].t, cr.W["W1"].t, cr.W["W2"].t, cr.chef.t] +
+              [g.walks[-1][1] for g in cr.guests.values() if g.walks]) + 20.0
+    cr.D = RF.FINALE_AT + RF.FINALE_LEN                # (the dinner clip ends with the finale)
+    if end > cr.D:
+        raise RuntimeError(f"dinner work runs to {end:.0f}s, past the end of the finale ({cr.D:.0f}s)")
+    for who in ("W1", "W2", "chef"):
+        st = cr.chef if who == "chef" else cr.W[who]
+        cr.kit_idle(who, st.t, cr.D - 1.0)
+    rw = cr.W["RW"]
+    t = 0.0
+    for t0, t1, _l in sorted(rw.tasks):
+        cr.post_idle("RW", t, t0)
+        t = t1
+    cr.post_idle("RW", t, cr.D)
     CF.author_dinner(cr, La, cr.D, random.Random("mime-dinner"))
     return cr, La
 
@@ -2340,8 +2879,6 @@ def finish(cr):
                 continue
             if not g.free("R", t - 0.3, t + 5.0):
                 continue
-            if cr.La - 6.0 < t < cr.La + LINGER + 2.0:      # no glass in hand where the client cuts
-                continue
             g.sip(t, glass, 0.08)
         flute = P.glasses[("champ", k)]
         for p0, p1 in g.patio:                       # champagne on the patio
@@ -2353,16 +2890,23 @@ def finish(cr):
     segs = conversation(cr.rng, cr.t_seated + 12.0, cr.t_first_up)
     for k, g in cr.guests.items():
         segs[k] = [sg for sg in segs[k] if g.seated[0] + 1.0 < sg[0] and sg[1] < g.seated[1] - 0.5]
+    for k, g in cr.guests.items():                   # the mime at the head of the table: they watch
+        for w0, w1 in CF.watching(cr.mime, "dining"):
+            segs[k] = [sg for sg in segs[k] if sg[1] <= w0 or sg[0] >= w1]
+            segs[k] += _watch_segs(g, w0, w1, CF.DINING_STAGE)
     pt = patio_talk(random.Random("patio"), 0.0, LOOP)
     pubt = pub_talk(random.Random("pubdinner"), min(g.pub[0][0] for g in cr.guests.values()), cr.D, cr.guests)
     for k, g in cr.guests.items():
-        segs[k] += [sg for sg in pt[k] if any(p0 + 1.0 < sg[0] and sg[1] < p1 - 0.5 for p0, p1 in g.patio)]
+        segs[k] += [sg for sg in pt[k] if any(p0 + 1.0 < sg[0] and sg[1] < p1 - 0.5 for p0, p1 in g.patio)
+                    and not any(w0 - 1.0 < sg[1] and sg[0] < w1 + 1.0 for w0, w1 in g.watch)]
         segs[k] += pubt[k]
+        for w0, w1 in g.watch:                       # standing round the couple's table for the finale
+            segs[k] += _watch_segs(g, w0, w1, RF.MIME_PUB)
         gestures(g, segs[k], g.rng)
         build_gaze(g, segs[k], cr.D)
         hold_end(g.f)
         g.f.put(LOOP, g.x, g.y, g.f._yaw)
-    CF.author_couple(cr, cr.D, (cr.La - 6.0, cr.La + LINGER + 6.0))
+    CF.author_couple(cr, cr.D)
     CF.close_mime(cr.mime, cr.D)
     for s in list(cr.W.values()) + [cr.chef]:
         f = s.f
@@ -2383,13 +2927,33 @@ class LCrew(Crew):
         self.P = PropSet()
         self.rng = random.Random("lounge")
         self.guests = {k: Guest(k, random.Random(f"lounge{k}"), lounge=True) for k in GUESTS}
-        self.W = {w: Staff(WAITER_TAG[w], WAITER_LOOK[w], PUB_POST[w], z=RV_FLOOR) for w in ("W1", "W2")}
-        self.chef = Staff(CHEF_TAG, CHEF_LOOK, CHEF_START, speed=1.15)
-        self.n_task = {"W1": 0, "W2": 0, "chef": 0, **{f"G{k}": 0 for k in GUESTS}}
+        self.W = {w: Staff(WAITER_TAG[w], WAITER_LOOK[w], kit_spot(w)) for w in ("W1", "W2")}
+        self.W["RW"] = Staff(RW_TAG, RW_LOOK, PUB_POST["RW"], z=RV_FLOOR)
+        self.chef = Staff(CHEF_TAG, CHEF_LOOK, kit_spot("chef"), speed=1.15)
+        for st in (self.W["W1"], self.W["W2"], self.chef):        # glass in hand, as the dinner leaves them
+            st.hold["R"] = "drink"
+            st.f.R[0] = (0.0, HAND_CARRY["drink"]["R"].copy())
+        self.n_task = {"W1": 0, "W2": 0, "RW": 0, "chef": 0, "CA": 0, "CB": 0, **{f"G{k}": 0 for k in GUESTS}}
         self.glass_on = {k: [] for k in range(1, 9)}
         self.last_pour = {}
         self.rovers_from = 0.0
-        CF.add_actors(self, CF.LOUNGE_DUE)
+        self.lounge = True
+        CF.add_actors(self, CF.LOUNGE_DUE, lounge=True)
+
+
+def _watch_segs(g, w0, w1, xy):
+    """Watching the mime from w0 to w1: eyes on him, a laugh now and then."""
+    rng = random.Random(f"watch{g.k}{int(w0)}")
+    out = []
+    t = w0 + rng.uniform(0.3, 1.5)
+    while t < w1 - 1.0:
+        d = min(rng.uniform(4.0, 9.0), w1 - t)
+        out.append((t, t + d, ("pos", xy), "listen"))
+        t += d
+        if rng.random() < 0.3 and t + 2.0 < w1:
+            out.append((t, t + 2.0, ("pos", xy), "laugh"))
+            t += 2.0
+    return out
 
 
 def pub_talk(rng, t0, t1, guests):
@@ -2446,46 +3010,43 @@ def author_lounge(delays, crd):
         fk, _ = pd.fill_keys()
         pr.fill0 = float(sample(fk, 1, crd.D)[1]) if pr.kind in ("plate", "glass") else pr.fill0
         pr.grip = pd.grip
-    # Each guest off to the loo once a loop.
-    for k, t_w in WC_PLAN:
-        d, _ = cr.delay(f"G{k}")
+    # After the finale the mime mingles (cafe_figures); each guest is off to
+    # the loo twice a loop (every guest's trips authored in time order).
+    CF.author_lounge(cr, random.Random("mime-lounge"))
+    cr.mime.uni_park0 = crd.mime.uni_at["pub"][2]      # (left laid down outside the Rovers)
+    for who in ("A", "B"):                           # their glasses on the table, as the dinner leaves them
+        h = P.cafe_wine[who].holder_at(0.0)
+        cr.couple[who].wine = (0.0, LOOP) if h and h[0] == "spot" else None
+    trips = {k: [(t_w, "wc", None) for kk, t_w in WC_LOUNGE if kk == k] for k in GUESTS}
+    for k in GATHER_ORDER:
         g = cr.guests[k]
-        cr.guests[k].wc_trip(t_w + d, P, g.rng.uniform(40.0, 55.0))
-    # The waiters' rounds of top-ups (each waits for anyone who is up); W1
-    # also pours the café mime his red when he comes over, and clears his
-    # empty after.
-    t_arr = CF.author_lounge_until_rovers(cr, random.Random("mime-lounge"))
-    jobs = {w: sorted([(t_r, "round", (wine, ks)) for t_r, wine, ks in r], key=lambda j: j[0])
-            for w, r in ROUNDS.items()}
-    jobs["W1"].append((t_arr - 12.0, "mime", None))
-    jobs["W1"].append((CF.WAITER_DUE, "coffee", None))          # a round of espressos for the café couple
-    jobs["W1"].sort(key=lambda j: j[0])
-    for w in ("W2", "W1"):
-        q = list(jobs[w])
-        while q:
-            t_r, kind, arg = q.pop(0)
-            if kind == "round":
-                cr.pub_pour(w, max(cr.W[w].t, t_r), *arg)
-            elif kind == "mime":
-                t_pour = CF.waiter_pour_for_mime(cr, max(cr.W[w].t, t_r))
-                t_glass = CF.author_lounge_from_rovers(cr, t_pour)
-                q.append((t_glass + 12.0, "stash", None))
-                q.sort(key=lambda j: j[0])
-            elif kind == "coffee":                          # the second round: the chef's pair goes back
-                CF.coffee_run(cr, max(cr.W[w].t, t_r), w, old=3 - cr.cafe_on)
-            else:
-                CF.waiter_stash_glass(cr, max(cr.W[w].t, t_r))
-    end = max(s.t for s in cr.W.values())
-    end = max([end] + [g.walks[-1][1] for g in cr.guests.values() if g.walks])
+        t_free = 0.0
+        for t_x, kind, arg in sorted(trips[k]):
+            d, _ = cr.delay(f"G{k}")
+            t_free = g.wc_trip(max(t_x + d, t_free + 2.0), P, g.rng.uniform(40.0, 55.0))
+    # The Rovers barmaid: rounds of top-ups for the party (she waits for anyone
+    # who is up) and for the café couple at their table.
+    jobs = [(t_r, "round", (wine, ks)) for t_r, wine, ks in RW_ROUNDS]
+    for t_c in RW_COUPLE_TOPUPS:
+        jobs += [(t_c, "couple", "B"), (t_c + 40.0, "couple", "A")]
+    for t_j, kind, arg in sorted(jobs, key=lambda j: j[0]):
+        t_av = max(cr.W["RW"].t, t_j)
+        if kind == "round":
+            cr.pub_pour("RW", t_av, *arg)
+        else:
+            cr.rw_couple_topup(t_av, arg)
+    # The kitchen: the waiters and the chef over a glass of red.
+    cr.kit_idle("chef", 0.0, LOOP - 1.0)
     for w in ("W1", "W2"):
-        s = cr.W[w]
-        gaps = sorted(s.tasks)
-        t = 0.0
-        for t0, t1, _l in gaps:
-            cr.post_idle(w, t, t0)
-            t = t1
-        cr.post_idle(w, t, LOOP - 1.0)
-    cr.chef_idle(0.0, LOOP - 1.0)
+        cr.kit_idle(w, 0.0, LOOP - 1.0)
+    end = max(s.t for s in list(cr.W.values()) + [cr.chef])
+    end = max([end] + [g.walks[-1][1] for g in cr.guests.values() if g.walks])
+    s = cr.W["RW"]
+    t = 0.0
+    for t0, t1, _l in sorted(s.tasks):
+        cr.post_idle("RW", t, t0)
+        t = t1
+    cr.post_idle("RW", t, LOOP - 1.0)
     return cr, end
 
 
@@ -2500,8 +3061,14 @@ def finish_lounge(cr, crd):
                 g.sip_held(t, glass, 0.05, LOUNGE_HOLD)
             t += rng.uniform(25, 45)
     segs = pub_talk(cr.rng, 2.0, LOOP, cr.guests)
+    snug = CF.watching(cr.mime, "snug")
     for k, g in cr.guests.items():
         segs[k] = [sg for sg in segs[k] if not any(w0 - 1.0 < sg[1] and sg[0] < w1 + 1.0 for w0, w1 in g.walks)]
+        for w0, w1 in snug:                          # the mime at their tables
+            w0, w1 = w0 + 1.0, w1 - 0.5
+            if not any(a - 1.0 < w1 and w0 < b + 1.0 for a, b in g.walks):
+                segs[k] = [sg for sg in segs[k] if sg[1] <= w0 or sg[0] >= w1]
+                segs[k] += _watch_segs(g, w0, w1, CF.SNUG_SPOT)
         gestures(g, segs[k], g.rng)
         build_gaze(g, segs[k])
         g.f.L.add(LOOP, g.f.L[0][1])
@@ -2520,6 +3087,22 @@ def finish_lounge(cr, crd):
         f.twist.add(LOOP, 0.0)
 
 
+def _mime_waits(cr, t, a, b):
+    """The café mime in someone's way: when the other one cannot be held back
+    (a Rovers regular, or anyone outside a task), he waits a little longer at
+    the start of his walk there instead. True when it did that."""
+    if "M" not in (a, b):
+        return False
+    o = b if a == "M" else a
+    if not o.startswith("R:") and o not in ("W1", "W2", "RW", "chef") and task_at(cr, o, t) is not None:
+        return False                                   # (the staff never wait for him: service comes first)
+    leg = CF.leg_at(cr.mime, t)
+    if leg is None:
+        raise RuntimeError(f"the mime and {o} clash at {t:.1f}s before any of his walks")
+    CF.LEG_WAIT[leg] = CF.LEG_WAIT.get(leg, 0.0) + 2.0
+    return True
+
+
 def plan_lounge(report, crd):
     delays = {}
     for attempt in range(300):
@@ -2531,11 +3114,7 @@ def plan_lounge(report, crd):
             report(f"LOUNGE SCHEDULE: work ends {end:.1f}s, {len(delays)} delays after {attempt} passes")
             return cr
         t, a, b = cl[0]
-        if "M" in (a, b) and (a.startswith("R:") or b.startswith("R:")):
-            leg = CF.leg_at(cr.mime, t)               # the café mime in the regulars' way: he waits a bit
-            if leg is None:
-                raise RuntimeError(f"lounge: the mime and {a if b == 'M' else b} clash at {t:.1f}s off his Rovers legs")
-            CF.LEG_WAIT[leg] += 2.0
+        if _mime_waits(cr, t, a, b):
             continue
         cand = [(task_at(cr, m, t), m) for m in (a, b) if not m.startswith("R:")]
         cand = [(i, m) for i, m in cand if i is not None]
@@ -2576,17 +3155,21 @@ def actor(cr, who):
 ROVERS = {}
 
 
-def rovers_tracks(step=0.25):
-    """The Rovers regulars' roots on their own (PHASE) timeline: [(tag, xy, vis)]."""
-    if step not in ROVERS:
-        figs = getattr(RF, "PLANNED", None)
+def rovers_tracks(step=0.25, variant="Loop"):
+    """The Rovers regulars' roots on their own timeline, [(tag, xy, vis)]:
+    the loop (PHASE long), the finale's Show clip (FINALE_LEN) or the loop
+    after the finale (rovers_figures builds all three)."""
+    key = (step, variant)
+    if key not in ROVERS:
+        figs = {"Loop": getattr(RF, "PLANNED", None), "Show": getattr(RF, "PLANNED_SHOW", None),
+                "After": getattr(RF, "PLANNED_AFTER", None)}[variant]
         if figs is None:
-            cast, pours, _pat = RF._plan(RF.PATTERN, lambda *a: None)
-            figs = [m.f for m in cast.values()] + [RF._barman(pours)]
-        n = int(round(PHASE / step))
+            raise RuntimeError("rovers_figures.build() must run before the dinner (the regulars' tracks)")
+        length = RF.FINALE_LEN if variant == "Show" else PHASE
+        n = int(round(length / step))
         out = []
         for f in figs:
-            if f.tag.startswith("Bed") or abs(f.loop - PHASE) > 1e-6:
+            if f.tag.startswith("Bed") or abs(f.loop - length) > 1e-6:
                 continue
             f.root.done()
             r = sample(f.root, n - 1, step)
@@ -2596,17 +3179,38 @@ def rovers_tracks(step=0.25):
             else:
                 v = np.ones(n, bool)
             out.append((f.tag, np.array([(q.x, q.y) for q in r]), v))
-        ROVERS[step] = out
-    return ROVERS[step]
+        ROVERS[key] = out
+    return ROVERS[key]
+
+
+def rovers_spans(times, step, lounge):
+    """[(mask over times, regulars' tracks, index into them)]: which of the
+    regulars' clips plays at each session time (the lounge loop: After)."""
+    if lounge:
+        return [(np.ones(len(times), bool), rovers_tracks(step, "After"),
+                 np.round((times % PHASE) / step).astype(int) % int(round(PHASE / step)))]
+    F0, F1 = RF.FINALE_AT, RF.FINALE_AT + RF.FINALE_LEN
+    out = []
+    for lo, hi, var, origin, length in ((0.0, F0, "Loop", 0.0, PHASE), (F0, F1, "Show", F0, RF.FINALE_LEN),
+                                       (F1, 1e9, "After", 0.0, PHASE)):
+        mask = (times >= lo) & (times < hi)
+        n = int(round(length / step))
+        idx = np.clip(np.round(((times - origin) % length) / step).astype(int), 0, n - 1)
+        out.append((mask, rovers_tracks(step, var), idx))
+    return out
 
 
 def clashes(cr, step=0.25):
     """Glide-path clashes between anyone (roots only, while visible), and with
     the Rovers regulars from cr.rovers_from on (their time is ours modulo PHASE)."""
-    who = ["W1", "W2", "chef"] + [f"G{k}" for k in GUESTS] + ["M", "CA", "CB"]
+    who = ["W1", "W2", "RW", "chef"] + [f"G{k}" for k in GUESTS] + ["M", "CA", "CB"]
     tr = np.array([[(v.x, v.y) for v in _roots(actor(cr, w).f, step)] for w in who])   # (A, n, 2)
     vs = np.array([_vis(actor(cr, w).f, step) for w in who])
     out = []
+    t_cut = getattr(cr, "D", None) if not getattr(cr, "lounge", False) else None   # (the dinner clip ends at D)
+    if t_cut:
+        n_cut = int(t_cut / step) + 1
+        tr, vs = tr[:, :n_cut], vs[:, :n_cut]
     for a in range(len(who)):
         for b in range(a + 1, len(who)):
             if who[a] in ("CA", "CB") and who[b] in ("CA", "CB"):
@@ -2616,16 +3220,15 @@ def clashes(cr, step=0.25):
             d = np.linalg.norm(tr[a] - tr[b], axis=1)
             for i in np.nonzero((d < thr) & vs[a] & vs[b])[0]:
                 out.append((i * step, who[a], who[b]))
-    rv = rovers_tracks(step)
     nt = tr.shape[1]
     times = np.arange(nt) * step
-    idx = np.round((times % PHASE) / step).astype(int) % int(round(PHASE / step))
     live = times >= getattr(cr, "rovers_from", 0.0)
-    for a in range(len(who)):
-        for tag, xy, v in rv:
-            d = np.linalg.norm(tr[a] - xy[idx], axis=1)
-            for i in np.nonzero((d < 0.42) & vs[a] & v[idx] & live)[0]:
-                out.append((i * step, who[a], "R:" + tag))
+    for mask, rv, idx in rovers_spans(times, step, getattr(cr, "lounge", False)):
+        for a in range(len(who)):
+            for tag, xy, v in rv:
+                d = np.linalg.norm(tr[a] - xy[idx], axis=1)
+                for i in np.nonzero((d < 0.42) & vs[a] & v[idx] & live & mask)[0]:
+                    out.append((i * step, who[a], "R:" + tag))
     out.sort(key=lambda c: c[0])
     return out
 
@@ -2665,6 +3268,8 @@ def plan(report, verbose=False):
                    f"{scale:.2f}, {len(delays)} delays after {attempt} passes")
             return cr
         t, a, b = cl[0]
+        if _mime_waits(cr, t, a, b):
+            continue
         movers = [m for m in (a, b) if not m.startswith("R:")]
         if verbose:
             report(f"     clash {a} / {b} at {t:.1f}s")
@@ -3219,15 +3824,18 @@ def gate_targets(recs, report):
         for side in ("L", "R"):
             d = np.linalg.norm(np.diff(R["target"][side], axis=0), axis=1)
             if d.max() > 0.15:
-                report(f"DINNER TARGET GATE: {tag}.{side} target jumps {d.max():.2f} m at {d.argmax() / FPS:.1f}s")
+                over = np.nonzero(d > 0.15)[0]
+                spots = [over[0]] + [b for a, b in zip(over, over[1:]) if b - a > FPS]
+                more = ", ".join(f"{d[i]:.2f} m at {i / FPS:.1f}s" for i in spots[:8])
+                report(f"DINNER TARGET GATE: {tag}.{side} target jumps {d.max():.2f} m at {d.argmax() / FPS:.1f}s ({more})")
                 ok = False
     return ok
 
 
-def gate_spacing(recs, report, rovers_from=None):
+def gate_spacing(recs, report, rovers_from=None, lounge=False):
     """Nobody too close to anyone (while both are visible); with rovers_from,
     nobody within 0.40 m of a Rovers regular from then on (phase-locked)."""
-    staff = [t for t in recs if t in (WAITER_TAG["W1"], WAITER_TAG["W2"], CHEF_TAG)]
+    staff = [t for t in recs if t in (WAITER_TAG["W1"], WAITER_TAG["W2"], RW_TAG, CHEF_TAG)]
     guests = [t for t in recs if t not in staff]
     vis = {t: recs[t]["vis"] > 0.5 for t in recs}
     bad = {}
@@ -3249,19 +3857,17 @@ def gate_spacing(recs, report, rovers_from=None):
                     bad.setdefault((a, b), (fi / FPS, d))
     if rovers_from is not None:
         step = 1.0 / FPS
-        rv = rovers_tracks(step)
-        n_ph = int(round(PHASE / step))
-        for fi in range(int(math.ceil(rovers_from * FPS)), N + 1, 3):
-            j = int(round((fi / FPS) % PHASE / step)) % n_ph
+        fis = np.arange(int(math.ceil(rovers_from * FPS)), N + 1, 3)
+        for mask, rv, idx in rovers_spans(fis / FPS, step, lounge):
             for tag, xy, v in rv:
-                if not v[j]:
-                    continue
                 for a in recs:
-                    if not vis[a][fi]:
+                    ok = mask & v[idx] & vis[a][fis]
+                    if not ok.any():
                         continue
-                    d = np.linalg.norm(recs[a]["pos"][fi, :2] - xy[j])
-                    if d < 0.40:
-                        bad.setdefault((a, "Rovers " + tag), (fi / FPS, d))
+                    d = np.linalg.norm(recs[a]["pos"][fis, :2] - xy[idx], axis=1)
+                    hit = np.nonzero(ok & (d < 0.40))[0]
+                    if len(hit):
+                        bad.setdefault((a, "Rovers " + tag), (fis[hit[0]] / FPS, d[hit[0]]))
     for (a, b), (t, d) in bad.items():
         report(f"DINNER SPACING GATE: {a} and {b} {d:.2f} m apart at {t:.1f}s")
     return not bad
@@ -3292,7 +3898,8 @@ def gate_routes(recs, report):
             for off in ((0, 0), (0.12, 0), (-0.12, 0), (0, 0.12), (0, -0.12)):
                 o = Vector((b[0] + off[0], b[1] + off[1], 1.6))
                 hit, loc, _n, _i, ob, _m = sc.ray_cast(dg, o, Vector((0, 0, -1)))
-                if hit and loc.z > max(fz, floor_z(o.x, o.y)) + 0.08:      # (the step up is floor)
+                lip = max(floor_z(o.x + dx, o.y + dy) for dx, dy in ((0, 0), (0.03, 0), (-0.03, 0), (0, 0.03), (0, -0.03)))
+                if hit and loc.z > max(fz, lip) + 0.08:      # (the step up is floor, its nosing proud of it)
                     bad.setdefault(tag, (fi / FPS, ob.name, tuple(round(c, 2) for c in loc)))
             # Walls and glass: a down-cast starting inside a thin sheet misses
             # it, so also look along the step at hip and chest height.
@@ -3442,10 +4049,10 @@ def build(report=print, strict=True):
     sc.render.fps = FPS
     sc.render.fps_base = 1.0
     # --- Dinner: once per session (authored on a long timeline, cut to D).
-    set_clip(11 * PHASE)
+    set_clip(12 * PHASE)
     crd = plan(report)
     finish(crd)
-    figs_d = [g.f for g in crd.guests.values()] + [crd.W["W1"].f, crd.W["W2"].f, crd.chef.f] + \
+    figs_d = [g.f for g in crd.guests.values()] + [crd.W["W1"].f, crd.W["W2"].f, crd.W["RW"].f, crd.chef.f] + \
         [crd.mime.f, crd.couple["A"].f, crd.couple["B"].f]
     RIGS = {}
     for fig in figs_d:
@@ -3472,8 +4079,8 @@ def build(report=print, strict=True):
     parm = build_props(crd.P, report)
     done_d = write_props(crd.P, parm, REC_D, report, "Dinner")
     carm = CF.build_rig(report)
-    cafe_d = CF.write_clip(carm, crd.mime, REC_D[CF.TAGS["M"]], "Dinner", report)
-    ok = (gate_targets(REC_D, report) & gate_spacing(REC_D, report, crd.La + LINGER) & gate_routes(REC_D, report) &
+    cafe_d = CF.write_clip(carm, crd.mime, REC_D[CF.TAGS["M"]], "Dinner", report, recs=REC_D)
+    ok = (gate_targets(REC_D, report) & gate_spacing(REC_D, report, 0.0) & gate_routes(REC_D, report) &
           gate_props(crd.P, done_d, REC_D, report, seam=False))
     end_d = {k: (v[0][-1:], v[1][-1:], v[2][-1:]) for k, v in done_d.items()}
     del done_d, REC_D
@@ -3483,7 +4090,7 @@ def build(report=print, strict=True):
     set_clip(LOUNGE_LOOP)
     crl = plan_lounge(report, crd)
     finish_lounge(crl, crd)
-    figs_l = [g.f for g in crl.guests.values()] + [crl.W["W1"].f, crl.W["W2"].f, crl.chef.f] + \
+    figs_l = [g.f for g in crl.guests.values()] + [crl.W["W1"].f, crl.W["W2"].f, crl.W["RW"].f, crl.chef.f] + \
         [crl.mime.f, crl.couple["A"].f, crl.couple["B"].f]
     R0 = {f.tag: f.R0 for f in figs_d}
     for fig in figs_l:
@@ -3499,9 +4106,9 @@ def build(report=print, strict=True):
         report(f"FIGURE {fig.tag}Lounge: {N + 1} frames -> {kept} keys")
     MATS.clear()
     done_l = write_props(crl.P, parm, REC_L, report, "Lounge")
-    cafe_l = CF.write_clip(carm, crl.mime, REC_L[CF.TAGS["M"]], "Lounge", report)
+    cafe_l = CF.write_clip(carm, crl.mime, REC_L[CF.TAGS["M"]], "Lounge", report, recs=REC_L)
     ok &= CF.gate(cafe_d, cafe_l, report)
-    ok &= (gate_targets(REC_L, report) & gate_spacing(REC_L, report, 0.0) & gate_routes(REC_L, report) &
+    ok &= (gate_targets(REC_L, report) & gate_spacing(REC_L, report, 0.0, lounge=True) & gate_routes(REC_L, report) &
            gate_props(crl.P, done_l, REC_L, report, seam=True))
     ok &= gate_switch(last_d, first_l, end_d, done_l, report)
     for t in REC_L:
@@ -3517,7 +4124,8 @@ def build(report=print, strict=True):
     # The client's cut: inject-hubs reads the linger window off this empty's name.
     if crd.D % PHASE > 1e-6 or LOUNGE_LOOP % PHASE > 1e-6:
         raise RuntimeError(f"dinner {crd.D}s / lounge {LOUNGE_LOOP}s not whole PHASEs")
-    meta = bpy.data.objects.new(f"DinnerMeta_L{int(round(crd.La * 1000))}_W{int(LINGER)}_P{int(PHASE)}", None)
+    meta = bpy.data.objects.new(f"DinnerMeta_L{int(round(crd.La * 1000))}_W{int(LINGER)}_P{int(PHASE)}"
+                                f"_F{int(RF.FINALE_AT)}_D{int(crd.D)}", None)
     sc.collection.objects.link(meta)
     report(f"DINNER LINGER: {crd.La:.1f}s + {LINGER:.0f}s, dinner {crd.D:.0f}s, phase {PHASE:.0f}s")
     report(f"DINNER: {total} figure keys, {time.time() - t_start:.0f}s")

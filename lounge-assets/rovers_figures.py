@@ -768,8 +768,8 @@ def _thin(rows, tol):
     return sorted(keep)
 
 
-def _write_action(fig, arm, frames):
-    act = bpy.data.actions.new(f"Fig_{fig.tag}Loop")
+def _write_action(fig, arm, frames, suffix="Loop"):
+    act = bpy.data.actions.new(f"Fig_{fig.tag}{suffix}")
     arm.animation_data_create()
     arm.animation_data.action = act
     slot = arm.animation_data.action_slot
@@ -861,10 +861,16 @@ def _pick_poles(fig, arm):
     return best
 
 
-def _realise(fig, report):
-    arm = _build_armature(fig)
-    _build_mesh(fig, arm)
-    poles = _pick_poles(fig, arm)
+def _realise(fig, report, arm=None, poles=None, suffix="Loop"):
+    """Solve fig and write its clip (Fig_<tag><suffix>). A variant clip of a
+    figure already realised (arm, poles given) shares its rig and rest."""
+    if arm is None:
+        arm = _build_armature(fig)
+        _build_mesh(fig, arm)
+        poles = _pick_poles(fig, arm)
+    elif arm.animation_data:                  # (an active clip would override the pose being solved)
+        arm.animation_data.action = None
+    fig.poles = poles
     worst = 0.0
     sizes = {g["name"]: GLASS[g["size"]][1] for g in fig.glasses if g["kind"] == "glass"}
     for it in range(8):
@@ -895,8 +901,9 @@ def _realise(fig, report):
                 report(f"  {fig.tag} contact '{key}' at {t:.1f}s off by {e.length * 1000:.0f} mm")
     miss = max(((r["wrist"][s] - r["target"][s]).length, i / FPS, s)
                for i, r in enumerate(frames) for s in ("L", "R") if r["vis"] > 0.5)
-    _act, kept = _write_action(fig, arm, frames)
-    report(f"FIGURE {fig.tag}: {len(frames)} frames -> {kept} keys, contact error {worst * 1000:.1f} mm, "
+    _act, kept = _write_action(fig, arm, frames, suffix)
+    report(f"FIGURE {fig.tag}{suffix if suffix != 'Loop' else ''}: {len(frames)} frames -> {kept} keys, "
+           f"contact error {worst * 1000:.1f} mm, "
            f"worst reach miss {miss[0] * 1000:.0f} mm at {miss[1]:.1f}s ({miss[2]})")
     for b in arm.pose.bones:
         b.matrix_basis = Matrix.Identity(4)
@@ -929,6 +936,10 @@ def heading(a, b):
 # Places (world). The corridor runs between the bar stools and the tables.
 CY = -12.85
 DOORS = {"G": -11.75, "L": -12.95}                 # Gents / Ladies door centres on x -3.70
+# From the hall line to each door: the Gents is round the far side of the café
+# couple's table, close along the party wall (the stage is north of the door).
+DOOR_IN = {"G": (-3.30, -11.75), "L": (-3.15, -12.95)}
+DOOR_VIA = {"G": [(-2.75, CY), (-3.30, -12.62)], "L": [(-2.75, CY)]}
 O1 = Vector((1.45, -14.47, 1.06))                  # bar-top spot where takeaway rounds are poured
 O1_STAND = (1.45, -13.98)
 SERVE_DT = 8.4                                     # barman: collect -> serve
@@ -962,6 +973,7 @@ class Mover:
         self.held = False           # glass always in hand (darts players), never set down at home
         self.sip_every = 26.0       # seconds at home per sip
         self.refills, self.deadlines, self.away, self.trips = [], [], [], []
+        self.watching = []          # (t0, t1) watching the café mime (busy, but she may serve them)
         self.f.wrist["spot"] = None
 
     def rest_of(self, side):
@@ -1099,18 +1111,13 @@ class Mover:
         return [self.stand, (self.stand[0], CY)]
 
     def door_route(self):
-        d = DOORS[self.door]
-        if self.kind == "shelf":
-            mid = {"G": [], "L": [(-2.55, -11.95)]}[self.door]
-            return [self.home[:2]] + mid + [(-3.15, d)]
-        return self.out_pts() + [(-2.75, CY), (-3.15, d)]
+        if self.door in self.routes:
+            return self.routes[self.door]
+        return self.out_pts() + DOOR_VIA[self.door] + [DOOR_IN[self.door]]
 
     def bar_route(self):
         if "bar" in self.routes:
             return self.routes["bar"]
-        if self.kind == "shelf":
-            via = [(-2.55, -11.55), (-1.05, CY)] if self.home[0] < -2.6 else [(-1.75, -11.55), (-0.95, CY)]
-            return [self.home[:2]] + via + [(O1_STAND[0], CY), O1_STAND]
         return self.out_pts() + [(O1_STAND[0], CY), O1_STAND]
 
     # trips -----------------------------------------------------------------
@@ -1131,12 +1138,13 @@ class Mover:
             t = self.stand_up(t)
         route = self.door_route()
         t = self.walk(t, route)
-        d = DOORS[self.door]
-        t = self.walk(t, [(-3.15, d), (-4.05, d)], speed=1.0)
+        din = DOOR_IN[self.door]
+        d = din[1]
+        t = self.walk(t, [din, (-4.05, d)], speed=1.0)
         f.vis.add(t, 1.0).add(t + 0.1, 0.001)
         t += away
         f.vis.add(t - 0.1, 0.001).add(t, 1.0)
-        t = self.walk(t, [(-4.05, d), (-3.15, d)], speed=1.0)
+        t = self.walk(t, [(-4.05, d), din], speed=1.0)
         t = self.walk(t, list(reversed(route)))
         t = self.turn(t, self.home[2])
         if self.seated:
@@ -1366,13 +1374,19 @@ def _cast():
     TM = Mover("TblM", dict(sex="m", skin="e0b08f", hair="9a948c", top="283a5c", legs="3a3f4a", sleeves="long",
                             glasses="2a2a2a"), "table", (1.50, -11.78, 0), TM_SPOT, "L", "pint",
                "G", -6, [-6], seat_z=0.56, stand=(1.50, -12.18), feet=((-0.12, 0.42, 0.42), (0.12, 0.40, 0.42)))
+    # The shelf pair stand at the short end of the shelf beside the stage now.
     SM = Mover("ShfM", dict(sex="m", skin="c48b66", hair="2c2420", hair_style="bald", beard=True, top="8a2f2a",
-                            legs="34404f", sleeves="rolled"), "shelf", (-3.20, -10.62, -55),
-               (-2.95, -10.24, SHELF_Z), "L", "pint", "G", -30, [-30], lean_reach=14, drink="stout")
+                            legs="34404f", sleeves="rolled"), "shelf", (-2.07, -10.64, -40),
+               (-2.00, -10.24, SHELF_Z), "L", "pint", "G", -30, [-30], lean_reach=14, drink="stout",
+               routes={"G": [(-2.07, -10.64), (-2.00, -11.02), (-2.62, -11.52), DOOR_IN["G"]],
+                       "bar": [(-2.07, -10.64), (-2.00, -11.02), (-1.55, -11.30), (-0.95, CY),
+                               (O1_STAND[0], CY), O1_STAND]})
     SF = Mover("ShfF", dict(sex="f", skin="f0c7a8", hair="241a16", hair_style="ponytail", top="e6dfd2",
                             jacket="2a2422", legs="2a2a30", skirt="2a2a30", sleeves="long"), "shelf",
-               (-2.05, -10.62, 55), (-2.35, -10.24, SHELF_Z), "R", "half", "L", 30, [30], lean_reach=14,
-               drink="lager")
+               (-1.60, -10.74, 40), (-1.66, -10.24, SHELF_Z), "R", "half", "L", 30, [30], lean_reach=14,
+               drink="lager",
+               routes={"L": [(-1.60, -10.74), (-1.50, -11.15), (-1.50, CY), (-2.75, CY), DOOR_IN["L"]],
+                       "bar": [(-1.60, -10.74), (-1.50, -11.15), (-0.95, CY), (O1_STAND[0], CY), O1_STAND]})
     # The darts fan by the end of the bar return; her way to the bar keeps
     # clear of the darts players' waiting row.
     DF = Mover("DtF", dict(sex="f", skin="f1c9ab", hair="a0402a", hair_style="long", top="c9a63a", legs="26263a",
@@ -1599,7 +1613,7 @@ DART_BACK = [(-2.15, -16.12), (-2.15, -14.70), (-2.15, DART_LINE_Y)]   # clear o
 DART_GAP = (-2.20, -13.40)           # the gap in the waiting row, out to the hall
 DART_HALL = (-2.20, CY)
 DART_DRINK = {"DtA": ("pint", "bitter"), "DtC": ("pint", "lager")}     # the other two are not drinking
-DART_TRIPS = {1: "wc", 4: "bar", 6: "bar", 11: "wc"}   # straight after turn i
+DART_TRIPS = {1: "wc", 6: "bar", 8: "bar", 9: "wc"}    # straight after turn i
 DART_ORDER = ["DtA", "DtB", "DtC", "DtD"]
 
 
@@ -1737,21 +1751,22 @@ def _dart_wc(m, t, t_by):
     """From the gap to the toilets and back to the wait spot by t_by.
     Returns the end time, or None if there is no time for it."""
     f = m.f
-    d = DOORS[m.door]
-    out = [DART_GAP, DART_HALL, (-2.75, CY), (-3.15, d)]
-    back = [(-3.15, d), (m.home[0], CY), m.home[:2]]
-    travel = walk_time(out) + 2 * walk_time([(-3.15, d), (-4.05, d)], 1.0) + walk_time(back) + 0.5
+    din = DOOR_IN[m.door]
+    d = din[1]
+    out = [DART_GAP, DART_HALL] + DOOR_VIA[m.door] + [din]
+    back = [din] + list(reversed(DOOR_VIA[m.door]))[:-1] + [(m.home[0], CY), m.home[:2]]
+    travel = walk_time(out) + 2 * walk_time([din, (-4.05, d)], 1.0) + walk_time(back) + 0.5
     away = min(40.0, t_by - t - travel)
     if away < 10.0:
         return None
     t0 = t
     t = m.walk(t, out)
-    t = m.walk(t, [(-3.15, d), (-4.05, d)], speed=1.0)
+    t = m.walk(t, [din, (-4.05, d)], speed=1.0)
     f.vis.add(t, 1.0).add(t + 0.1, 0.001)
     t += away
     f.vis.add(t - 0.1, 0.001).add(t, 1.0)
-    t = m.walk(t, [(-4.05, d), (-3.15, d)], speed=1.0)
-    t = _dart_back_home(m, t, [(-3.15, d)])
+    t = m.walk(t, [(-4.05, d), din], speed=1.0)
+    t = _dart_back_home(m, t, back[:-2])
     f.busy.append((t0, t + 0.8))
     m.away.append((t0, t))
     m.trips.append((t0, t, "dwc"))
@@ -1793,10 +1808,21 @@ def _dart_bar(m, t, t_by, pours):
     return t
 
 
-def _dart_sequence(players, n, slack, pours=None, starts=None):
+DART_TURN_MAX = 26.0                 # a turn, the longest it takes (to the oche and back, chalked)
+
+
+def dart_pause():
+    """The game stops while the mime plays the stage (SHOW["pub"]): every
+    player is back in the waiting row, turned round to watch him."""
+    a, b = SHOW["pub"]
+    return a - 4.0 - 6.0, b + 2.0 + 3.0
+
+
+def _dart_sequence(players, n, slack, pours=None, starts=None, pause=None):
     """Lay n turns into the timeline from 0.3 s, `slack` seconds of waiting
-    before each. With pours and the turn start times of a dry run, the trips
-    are authored too. Returns (end, turn start times)."""
+    before each (none across `pause`, when nobody throws). With pours and the
+    turn start times of a dry run, the trips are authored too. Returns (end,
+    turn start times)."""
     rng = random.Random("darts")
     for m in players.values():
         m.writes = []
@@ -1818,13 +1844,17 @@ def _dart_sequence(players, n, slack, pours=None, starts=None):
         m = players[tag]
         last = i == n - 1
         T += slack
+        if pause and T < pause[1] and T + DART_TURN_MAX > pause[0]:
+            T = pause[1]
         out.append(T)
-        trip = DART_TRIPS.get(i) if i < n - 4 else None
+        trip = DART_TRIPS.get(i) if i < n - 1 else None
         release, gone = _dart_turn(m, T, pos, rng, [(gg, z) for gg, z, _t in marks] if last else None, trip)
         w0, w1 = m.writes[-1]
         g["scale"].add(0.0, 0.001).add(w0, 0.001).add(w1, 1.0)
         if gone and pours is not None:
-            t_by = starts[i + 4] - 0.5
+            t_by = min(starts[i + 4] - 0.5, LOOP - 2.0)      # (back before the seam: all home at t=0)
+            if pause and release < pause[0]:
+                t_by = min(t_by, pause[0] - 1.0)
             done = None
             if trip == "bar" and m.g:
                 done = _dart_bar(m, release, t_by, pours)
@@ -1847,18 +1877,23 @@ def _darts_game(players, pours):
         for m in ps.values():
             m.at_home(0.0)
         return ps
+    pause = dart_pause()
     n = None
-    for k in range(22, 11, -1):
-        end, _s = _dart_sequence(scratch(), k, 0.0)
+    for k in range(22, 9, -1):
+        end, _s = _dart_sequence(scratch(), k, 0.0, pause=pause)
         if end <= LOOP - 0.3:
             n, end0 = k, end
             break
     if n is None:
         raise RuntimeError("darts game does not fit the loop")
     slack = (LOOP - 0.3 - end0) / n
-    _e, starts = _dart_sequence(scratch(), n, slack)
+    for _try in range(40):                   # (a jump over the pause can waste more once spread)
+        e, starts = _dart_sequence(scratch(), n, slack, pause=pause)
+        if e <= LOOP - 0.3:
+            break
+        slack *= 0.85
     starts = starts + [s + LOOP for s in starts]
-    end, _s = _dart_sequence(players, n, slack, pours, starts)
+    end, _s = _dart_sequence(players, n, slack, pours, starts, pause=pause)
     if end > LOOP + 1e-6:
         raise RuntimeError(f"darts game overruns the loop ({end:.1f}s)")
     for m in players.values():
@@ -1870,10 +1905,487 @@ def _darts_game(players, pours):
 # One pattern: bathroom trips (about one a minute), takeaway rounds, and the
 # barman's refills for the three on the stools (collect times). The booth
 # couple no longer fetch their own: the barmaid serves them.
+# --- The stage (build-penthouse builds it from these) ---------------------------
+# A little stage in the stand-up corner, between the Gents door and the front
+# window: 0.30 m up, its front corner cut on the diagonal so it faces the room,
+# a step along that cut, red drapes on the two walls behind it, footlights and a
+# spotlight on the ceiling. The drinking shelf is shorter (it starts east of
+# the stage) and the café couple's table stands in front of it (cafe_figures).
+STAGE_POLY = ((-3.70, -10.10), (-2.35, -10.10), (-2.35, -10.65), (-2.95, -11.25), (-3.70, -11.25))
+STAGE_TOP = CARPET + 0.30
+STAGE_STEP = ((-2.35, -10.65), (-2.95, -11.25), (-2.794, -11.406), (-2.194, -10.806))
+STEP_TOP = CARPET + 0.15
+SHELF_X = (-2.27, -1.50)
+STAGE_TABLE = (-3.46, -10.34)                      # his prop table (knife block on it)
+STAGE_TABLE_TOP = STAGE_TOP + 0.70
+BUCKET = (-3.48, -10.80)                           # the bubble bucket
+BUCKET_TOP = STAGE_TOP + 0.26
+CAB_TABLE = (-2.25, -11.85)                        # the café couple's table, front row
+CAB_TOP = CARPET + 0.72
+CAB_CHAIRS = {"A": (-2.65, -12.24), "B": (-2.00, -12.32)}
+CAB_SEAT = CARPET + 0.46
+SPOT_LAMP = Vector((-1.20, -11.80, 3.00))          # the spotlight's lens
+
+
+def on_stage(x, y, pad=0.0):
+    """Is (x, y) on the stage (pad metres in from its edges)?"""
+    return (-3.70 + pad <= x <= -2.35 - pad and -11.25 + pad <= y <= -10.10 - pad and
+            (y - x) >= -8.30 + pad * 1.414)
+
+
+def stage_z(x, y):
+    """Floor height under (x, y) in the Rovers: the stage, its step or the carpet."""
+    if on_stage(x, y):
+        return STAGE_TOP
+    if -8.30 - 0.22 * 1.414 <= (y - x) < -8.30 and -14.20 <= x + y <= -13.00:
+        return STEP_TOP
+    return CARPET
+
+
+# --- The café mime's shows (cafe_figures) -------------------------------------
+# Every round the mime does an act on the stage and one at the hot tub at the
+# same marks of every loop (SHOW, seconds into LOOP), so the regulars can watch:
+# the shelf couple, the darts players (their game stops) and the darts fan turn
+# round to him, the bar regulars and the booth couple look over, the bathers
+# stop their game.
+MIME_PUB = (-3.00, -10.68)                         # on the stage
+MIME_PUB_FACE = -128.0                             # to the room
+CAB_YAW = {k: heading(v, MIME_PUB) for k, v in CAB_CHAIRS.items()}
+STAGE_WAY = ((-1.30, -11.30), (-2.20, -11.28), (-2.58, -11.04))   # in from the door, onto the step
+MIME_TUB = (-9.75, -5.05)                          # north of the hot tub, facing the bathers
+SHOW = {"pub": (121.0, 209.0), "tub": (239.0, 325.0)}
+# Who watches, and how: "turn" (standing: they turn round to him), "look"
+# (seated: head round, and round on the stool when he is behind them), "bathe"
+# (in the tub: the game waits). Hands free: everyone claps his last bow.
+WATCHERS = {"SM": "turn", "SF": "turn", "DF": "turn", "A": "look", "B": "look", "C": "look", "TF": "look",
+            "TM": "look", "TubA": "bathe", "TubB": "bathe", "TubS": "bathe",
+            "DtA": "turn", "DtB": "turn", "DtC": "turn", "DtD": "turn"}
+SWIVEL = {"A": 75.0, "B": 75.0, "C": 75.0, "TM": 40.0}     # how far round on their stool (deg)
+
+
+def show_span(key):
+    """(venue, the mime's spot, watching from, to) for a watcher."""
+    v = "tub" if key.startswith("Tub") else "pub"
+    a, b = SHOW[v]
+    return v, (MIME_TUB if v == "tub" else MIME_PUB), a - 4.0, b + 2.0
+
+
+def watch_show(m, key, rng):
+    """While the mime plays at their mark of the loop, m (when free: not off
+    on a trip) watches him: faces him (turning round, or round on the stool),
+    follows the juggling up, a laugh or two, claps his last bow."""
+    _v, tgt, w0, w1 = show_span(key)
+    spans = [(w0, w1)]
+    for t0, t1, kind in m.trips:                       # off to the loo or the bar: those bits are missed
+        out = []
+        for a, b in spans:
+            if t1 + 2.0 <= a or t0 - 2.0 >= b:
+                out.append((a, b))
+                continue
+            if t0 - 2.0 - a >= 10.0:
+                out.append((a, t0 - 2.0))
+            if b - (t1 + 2.0) >= 10.0:
+                out.append((t1 + 2.0, b))
+        spans = out
+    for a, b in spans:
+        _watch(m, key, rng, tgt, a, b, [SHOW[_v][1] - 2.6])
+
+
+def _watch(m, key, rng, tgt, w0, w1, tbs, big=()):
+    f = m.f
+    x, y, yaw0 = m.home
+    mode = WATCHERS[key]
+    rel = ((heading((x, y), tgt) - yaw0) + 180.0) % 360.0 - 180.0
+    if mode == "turn":
+        body = rel
+    elif mode == "look":
+        lim = SWIVEL.get(key, 0.0)
+        body = math.copysign(min(lim, max(0.0, abs(rel) - 45.0)), rel)
+    else:
+        body = 0.0
+    head = max(-60.0, min(60.0, rel - body))
+    lap = {"L": V((-0.12, 0.28, 0.99)), "R": V((0.12, 0.28, 0.99))}
+    stool = bool(body) and m.seated and mode == "look"   # round on the stool: hands to the lap
+    if body:                                            # (turned from the yaw the track has there, unwrapped)
+        base = track(sorted(f.root, key=lambda k: k[0]), w0).z
+        prev = f._yaw
+        f._yaw = base
+        f.put(w0, x, y, base)
+        f.put(w0 + 1.2, x, y, base + body)
+        f.put(w1, x, y, base + body)
+        f.put(w1 + 1.2, x, y, base)
+        f._yaw = prev
+    if stool:
+        for side in "LR":
+            k = f.L if side == "L" else f.R
+            k.hold(w0).add(w0 + 1.0, lap[side].copy())
+    f.yaw.add(w0 + 0.2, 0.0)
+    t = w0 + 1.2
+    while t < w1 - 3.0:
+        d = min(rng.uniform(3.0, 6.0), w1 - 3.0 - t)
+        f.yaw.add(t, head + rng.uniform(-8, 8)).add(t + d - 0.4, head + rng.uniform(-8, 8))
+        if rng.random() < 0.25:
+            f.pitch.add(t + 0.3, -12).add(t + 1.2, -4).add(t + 1.8, -6)          # a laugh
+        else:
+            f.pitch.add(t + 0.3, -6).add(t + d - 0.4, -4)
+        t += d
+    for tb in tbs:
+        if not (w0 + 2.0 < tb < w1 - 2.0) or mode == "bathe":   # his bows: they clap them (the bathers just
+            continue                                              # watch: some rounds he is at the dinner table)
+        n = 14 if tb in big else 6
+        if m.f.tag.startswith("Dt"):                 # darts in one hand, a pint in the other: a cheer
+            side = m.hand if m.held else "R"
+            up = f.L if side == "L" else f.R
+            sx = -0.10 if side == "L" else 0.10
+            up.hold(tb - 0.6).add(tb, V((sx, 0.30, 1.62))).add(tb + 0.25 * n, V((sx, 0.30, 1.62)))
+            up.add(tb + 0.25 * n + 0.6, m.rest_of(side))
+            f.pitch.add(tb, -6).add(tb + 0.25 * n, -6).add(tb + 0.25 * n + 0.6, -4)
+            continue
+        clap = {"L": V((-0.07, 0.30, 1.22)), "R": V((0.07, 0.30, 1.22))}
+        f.L.hold(tb - 0.6)
+        f.R.hold(tb - 0.6)
+        for q in range(n):
+            tq = tb + q * 0.3
+            f.L.add(tq, clap["L"].copy()).add(tq + 0.15, V((-0.025, 0.30, 1.22)))
+            f.R.add(tq, clap["R"].copy()).add(tq + 0.15, V((0.025, 0.30, 1.22)))
+        f.pitch.add(tb, 0).add(tb + 0.3 * n - 0.2, -4)
+        if stool:
+            f.L.add(tb + 0.3 * n + 0.5, lap["L"].copy())
+            f.R.add(tb + 0.3 * n + 0.5, lap["R"].copy())
+        else:
+            f.L.add(tb + 0.3 * n + 0.6, m.rest_of("L"))
+            f.R.add(tb + 0.3 * n + 0.6, m.rest_of("R"))
+    for side in "LR":
+        k = f.L if side == "L" else f.R
+        k.add(w1 + (1.2 if stool else 0.6), m.rest_of(side))
+    f.pitch.add(w1 + 1.2, 4)
+    f.yaw.add(w1 + 1.2, m.partner_yaw)
+    f.lean.hold(w0).add(w0 + 1.0, m.rest[2] + 2).add(w1 + 1.2, m.rest[2])
+    f.busy.append((w0 - 0.6, w1 + 1.8))
+    m.watching.append((w0 - 0.6, w1 + 1.8))
+    m.trips.append((w0 - 0.6, w1 + 1.8, "watch"))
+
+
+class _Phantom:
+    """Someone the regulars keep clear of while they are planned (the café
+    mime, the dinner party standing round him): a root track, never realised."""
+
+    def __init__(self, tag, xy, spans):
+        f = Figure(tag, {})
+        f.put(0.0, xy[0], xy[1], 0.0)
+        f.put(LOOP, xy[0], xy[1], 0.0)
+        f.vis.add(0.0, 0.0)
+        for a, b in spans:
+            f.vis.add(a - 0.01, 0.0).add(a, 1.0).add(b, 1.0).add(b + 0.01, 0.0)
+        f.vis.add(LOOP, 0.0)
+        for k in (f.root, f.vis):
+            k.done()
+        self.f = f
+        self.trips = []
+
+
+def _phantoms():
+    a, b = SHOW["pub"]
+    ta, tb = SHOW["tub"]
+    out = [_Phantom("phM", MIME_PUB, [(a - 2.0, b + 8.0)]), _Phantom("phT", MIME_TUB, [(ta - 3.0, tb + 3.0)])]
+    door = [(-0.65, -9.30), (-0.65, -10.20), (-0.65, -11.10)] + list(STAGE_WAY)
+    out += [_Phantom(f"phD{i}", p, [(a - 14.0, a), (b + 2.0, b + 12.0)]) for i, p in enumerate(door)]
+    return out
+
+
+PHANTOMS = _phantoms()
+
+
+# --- The finale --------------------------------------------------------------
+# Once a night, from the start of the session's tenth phase (FINALE_AT, session
+# seconds; the client starts each session on this loop's beat), the mime's
+# finale fills the stage for FINALE_LEN (cafe_figures plays it on the dinner
+# party's clock). The pub regulars then play their Show clip (the client
+# switches them to it for that span): no trips, no darts, everyone turned to the
+# stage from FINALE_WATCH on, applause at each of his bows (FINALE_BOWS, the
+# last the big one). After the finale the mime has finished performing, so
+# from then on every regular who watched him plays an After clip: the same
+# loop with nobody watching an empty stage or an empty hot tub (the bathers
+# switch to theirs at FINALE_AT, when he stops coming to them).
+FINALE_AT = 9 * LOOP
+FINALE_LEN = 2 * LOOP
+FINALE_BOWS = (46.0, 140.0, 186.0, 300.0, 346.0, 412.0, 560.0)
+FINALE_BIG = 560.0
+FINALE_WATCH = (14.0, 604.0)
+SHOW_TAGS = ("BarA", "BarB", "BarC", "TblF", "TblM", "ShfM", "ShfF", "DtF", "DtA", "DtB", "DtC", "DtD",
+             "Wtr", "Bm", "Pno")
+AFTER_TAGS = ("BarA", "BarB", "BarC", "TblF", "TblM", "ShfM", "ShfF", "DtF", "DtA", "DtB", "DtC", "DtD",
+              "TubA", "TubB", "TubS")
+
+
+def _frozen(g, L):
+    """A copy of prop g that stays all clip long as it is at the loop's t=0."""
+    n = dict(g)
+    t0, t1, mode, spot = _seg_at(g, 0.0)
+    n["segs"] = [(0.0, L + 1.0, mode, spot)]
+    n["events"] = []
+    for k in ("fill", "tilt", "scale"):
+        keys = g.get(k)
+        n[k] = Keys()
+        if keys:
+            v = track(sorted(keys, key=lambda kv: kv[0]), 0.0)
+            n[k].add(0.0, v).add(L, v)
+    return n
+
+
+def _mirror(sf, lf):
+    """Give the show figure sf exactly the loop figure lf's props (bone for
+    bone, frozen as they are at t=0) and its named hand poses."""
+    sf.glasses = [_frozen(g, sf.loop) for g in lf.glasses]
+    sf.wrist = {k: v for k, v in lf.wrist.items()}
+    sf.hand, sf.tray = lf.hand, lf.tray
+    if lf.pump is not None:
+        sf.pump = Keys().add(0.0, 0.0).add(sf.loop, 0.0)
+
+
+def _pose0(sf, lf):
+    """sf's channels start (and end) exactly as lf's loop does at t=0."""
+    L = sf.loop
+    for name in ("zk", "lean", "pitch", "yaw", "fL", "fR", "L", "R"):
+        src = getattr(lf, name)
+        if not src:
+            continue
+        v = track(sorted(src, key=lambda kv: kv[0]), 0.0)
+        v = v.copy() if hasattr(v, "copy") else v
+        getattr(sf, name).add(0.0, v).add(L, v.copy() if hasattr(v, "copy") else v)
+    r = track(sorted(lf.root, key=lambda kv: kv[0]), 0.0)
+    sf._yaw = None
+    sf.put(0.0, r.x, r.y, r.z)
+    sf.vis.add(0.0, 1.0).add(L, 1.0)
+
+
+def _show_people(loop_figs, report=print):
+    """The pub regulars' Show clip (FINALE_LEN long): see FINALE_AT."""
+    global LOOP
+    saved = LOOP
+    LOOP = FINALE_LEN
+    try:
+        lf = {f.tag: f for f in loop_figs}
+        cast = _cast()
+        cast.update(_dart_players())
+        rng = random.Random("finale-watch")
+        out = []
+        for key, m in cast.items():
+            f = m.f
+            f.loop = LOOP
+            _mirror(f, lf[f.tag])
+            m.g = next((g for g in f.glasses if g["name"] == "G"), None)
+            m.darts = []
+            m.at_home(0.0)
+            _pose0(f, lf[f.tag])
+            _watch(m, key, rng, MIME_PUB, FINALE_WATCH[0], FINALE_WATCH[1], FINALE_BOWS, big=(FINALE_BIG,))
+            idle(m, random.Random(f.tag + "show"))
+            m.at_home(LOOP)
+            _pose0_end(f, lf[f.tag])
+            out.append(f)
+        out.append(_waitress_show(lf["Wtr"]))
+        out.append(_barman_show(lf["Bm"]))
+        out.append(_pianist_show(lf["Pno"]))
+        for f in out:
+            for k in (f.root, f.zk, f.vis, f.lean, f.pitch, f.yaw, f.L, f.R, f.fL, f.fR):
+                if k:
+                    k.done()
+            if f.pump is not None:
+                f.pump.done()
+            for g in f.glasses:
+                for k in ("fill", "tilt", "scale"):
+                    g[k].done()
+        return out
+    finally:
+        LOOP = saved
+
+
+def _pose0_end(sf, lf):
+    """Close every channel of sf on lf's t=0 values (the clip ends where the
+    loop it hands back to begins)."""
+    L = sf.loop
+    for name in ("zk", "lean", "pitch", "yaw", "fL", "fR", "L", "R"):
+        src = getattr(lf, name)
+        if not src:
+            continue
+        v = track(sorted(src, key=lambda kv: kv[0]), 0.0)
+        getattr(sf, name).add(L, v.copy() if hasattr(v, "copy") else v)
+    r = track(sorted(lf.root, key=lambda kv: kv[0]), 0.0)
+    base = track(sorted(sf.root, key=lambda kv: kv[0]), L - 0.01).z
+    yaw = r.z
+    while yaw - base > 180:
+        yaw -= 360
+    while yaw - base < -180:
+        yaw += 360
+    sf.root.add(L, Vector((r.x, r.y, yaw)))
+
+
+def _stage_turn(f, x, y, yaw0, w0, w1):
+    """Turn round on the spot to face the stage for w0..w1 (body), and back."""
+    face = heading((x, y), MIME_PUB)
+    rel = ((face - yaw0) + 180.0) % 360.0 - 180.0
+    f.root.add(w0, Vector((x, y, yaw0))).add(w0 + 1.6, Vector((x, y, yaw0 + rel)))
+    f.root.add(w1, Vector((x, y, yaw0 + rel))).add(w1 + 1.6, Vector((x, y, yaw0)))
+
+
+def _show_heads(f, rng, w0, w1, bows, big, hands):
+    """Eyes on the stage, a laugh now and then, applause at each bow."""
+    t = w0 + 1.8
+    while t < w1 - 2.0:
+        d = min(rng.uniform(3.0, 6.0), w1 - 2.0 - t)
+        f.yaw.add(t, rng.uniform(-8, 8)).add(t + d - 0.4, rng.uniform(-8, 8))
+        if rng.random() < 0.22:
+            f.pitch.add(t + 0.3, -12).add(t + 1.2, -4).add(t + 1.8, -6)
+        else:
+            f.pitch.add(t + 0.3, -4).add(t + d - 0.4, -2)
+        t += d
+    if not hands:
+        return
+    rest_l, rest_r = hands
+    for tb in bows:
+        n = 14 if tb in big else 6
+        f.L.hold(tb - 0.6)
+        f.R.hold(tb - 0.6)
+        for q in range(n):
+            tq = tb + q * 0.3
+            f.L.add(tq, V((-0.07, 0.30, 1.22))).add(tq + 0.15, V((-0.025, 0.30, 1.22)))
+            f.R.add(tq, V((0.07, 0.30, 1.22))).add(tq + 0.15, V((0.025, 0.30, 1.22)))
+        f.L.add(tb + 0.3 * n + 0.6, rest_l.copy())
+        f.R.add(tb + 0.3 * n + 0.6, rest_r.copy())
+
+
+def _waitress_show(lw):
+    """The barmaid at her station: turned round to the stage for the show."""
+    f = Figure("Wtr", WTR_LOOK, loop=LOOP)
+    _mirror(f, lw)
+    _pose0(f, lw)
+    w0, w1 = FINALE_WATCH
+    _stage_turn(f, STN[0], STN[1], track(sorted(lw.root, key=lambda kv: kv[0]), 0.0).z, w0, w1)
+    rest_l, rest_r = V(REST["stand"][0]), V(REST["stand"][1])
+    f.L.add(w0, rest_l.copy())
+    f.R.add(w0, rest_r.copy())
+    _show_heads(f, random.Random("wtr-show"), w0, w1, FINALE_BOWS, (FINALE_BIG,), (rest_l, rest_r))
+    f.L.add(w1 + 1.6, rest_l.copy())
+    f.R.add(w1 + 1.6, rest_r.copy())
+    f.yaw.add(w1 + 1.6, 0).add(LOOP, 0)
+    f.pitch.add(w1 + 1.6, 3)
+    _pose0_end(f, lw)
+    return f
+
+
+def _barman_show(lb):
+    """The barman leans on the bar watching the show (wiping it either side)."""
+    f = Figure("Bm", lb.look, loop=LOOP, legs=False)
+    _mirror(f, lb)
+    _pose0(f, lb)
+    w0, w1 = FINALE_WATCH
+    r0 = track(sorted(lb.root, key=lambda kv: kv[0]), 0.0)
+    x = 2.50
+    st = (x, -15.15, 0)
+    def wipe(tt, cx=r0.x + 0.2):
+        w = 2 * math.pi * tt / 1.25
+        return f.to_local(tt, V((cx + 0.16 * math.sin(w), -14.72 + 0.045 * math.cos(w), 1.12)))
+    f.R.add(0.5, wipe).add(w0 - 0.6, wipe)
+    f.put(w0, r0.x, r0.y, r0.z)
+    f.put(w0 + 1.2, *st)
+    free, lowered = V((-0.16, 0.12, 0.98)), V((0.15, 0.20, 1.02))
+    f.L.hold(w0).add(w0 + 1.2, free)
+    f.R.hold(w0).add(w0 + 1.2, lowered)
+    on_bar = lambda xx: f.at_world((xx, -14.97, 1.11))
+    f.lean.add(w0 + 1.8, 17).add(w1 - 0.6, 17)
+    f.L.add(w0 + 1.8, on_bar(x - 0.25)).add(w1 - 0.6, on_bar(x - 0.25))
+    f.R.add(w0 + 1.8, on_bar(x + 0.25)).add(w1 - 0.6, on_bar(x + 0.25))
+    look = max(-70.0, min(70.0, heading((x, -15.15), MIME_PUB)))
+    rng = random.Random("bm-show")
+    t = w0 + 2.0
+    while t < w1 - 1.0:
+        f.yaw.add(t, look + rng.uniform(-8, 8))
+        f.pitch.add(t, rng.choice([-6, -2, 2]))
+        t += rng.uniform(1.2, 3.0)
+    tb = FINALE_BIG                                 # up off the bar to clap the big one
+    f.lean.add(tb - 0.8, 17).add(tb, 4).add(tb + 5.0, 4).add(tb + 5.8, 17)
+    f.L.add(tb - 0.8, on_bar(x - 0.25)).add(tb, V((-0.07, 0.30, 1.30)))
+    f.R.add(tb - 0.8, on_bar(x + 0.25)).add(tb, V((0.07, 0.30, 1.30)))
+    for q in range(14):
+        tq = tb + q * 0.3
+        f.L.add(tq + 0.15, V((-0.02, 0.30, 1.30))).add(tq + 0.3, V((-0.07, 0.30, 1.30)))
+        f.R.add(tq + 0.15, V((0.02, 0.30, 1.30))).add(tq + 0.3, V((0.07, 0.30, 1.30)))
+    f.L.add(tb + 5.8, on_bar(x - 0.25))
+    f.R.add(tb + 5.8, on_bar(x + 0.25))
+    f.yaw.add(w1, 0)
+    f.put(w1, *st)
+    f.put(w1 + 1.2, r0.x, r0.y, r0.z)
+    f.L.add(w1, free).add(w1 + 1.2, free)
+    f.R.add(w1, lowered).add(w1 + 1.2, lowered)
+    f.lean.add(w1 + 0.4, 6).add(w1 + 1.4, 18)
+    f.pitch.add(w1 + 0.4, 25)
+    f.R.add(w1 + 1.8, wipe).add(LOOP - 0.01, wipe)
+    _pose0_end(f, lb)
+    return f
+
+
+def _pianist_show(lp):
+    """He plays the show (the pianist accompanies it), turning on the stool to
+    clap the big finish."""
+    f = Figure("Pno", lp.look, loop=LOOP)
+    _mirror(f, lp)
+    _pose0(f, lp)
+    z = 0.62 + 0.08 - 0.93
+    key_z = 0.80 + 0.06 - z
+    rest_l, rest_r = V((-0.16, 0.34, key_z)), V((0.16, 0.34, key_z))
+    rng = random.Random("piano-show")
+    tb = FINALE_BIG
+    _play(f, rng, [(1.0, tb - 1.2), (tb + 6.4, LOOP - 1.0)], rest_l, rest_r, key_z)
+    f.L.add(tb - 0.6, V((-0.07, 0.30, 1.22)))
+    f.R.add(tb - 0.6, V((0.07, 0.30, 1.22)))
+    for q in range(14):
+        tq = tb + q * 0.3
+        f.L.add(tq + 0.15, V((-0.02, 0.30, 1.22))).add(tq + 0.3, V((-0.07, 0.30, 1.22)))
+        f.R.add(tq + 0.15, V((0.02, 0.30, 1.22))).add(tq + 0.3, V((0.07, 0.30, 1.22)))
+    sy = max(-70.0, min(70.0, ((heading(PNO_SEAT[:2], MIME_PUB) - PNO_SEAT[2]) + 180) % 360 - 180))
+    f.yaw.add(tb - 0.8, 0).add(tb, sy).add(tb + 4.4, sy).add(tb + 5.4, 0)
+    f.pitch.add(tb, 0).add(tb + 4.4, 0)
+    f.lean.add(tb, 4).add(tb + 4.4, 4)
+    _pose0_end(f, lp)
+    return f
+
+
+def _play(fig, rng, segs, rest_l, rest_r, key_z):
+    """Playing: phrases of chords and runs over the keys in each (a, b)."""
+    for a, b in segs:
+        fig.L.add(a, rest_l)
+        fig.R.add(a, rest_r)
+        t = a
+        while t < b - 1.0:
+            phrase = rng.uniform(3.0, 6.0)
+            beat = rng.choice([0.33, 0.4, 0.5])
+            lc, rc = rng.uniform(-0.30, -0.08), rng.uniform(0.06, 0.32)
+            tt = t
+            while tt < min(t + phrase, b - 1.0):
+                lx, rx = lc + rng.uniform(-0.05, 0.05), rc + rng.uniform(-0.07, 0.07)
+                fig.L.add(tt + 0.05, V((lx, 0.34, key_z + 0.035))).add(tt + beat * 0.5, V((lx, 0.35, key_z)))
+                fig.R.add(tt + 0.10, V((rx, 0.35, key_z + 0.03))).add(tt + beat * 0.55, V((rx, 0.36, key_z)))
+                tt += beat
+            mid = t + phrase * 0.5
+            if mid < b - 0.5:
+                fig.lean.add(mid, rng.uniform(10, 18))
+                fig.yaw.add(mid, rng.uniform(-12, 12))
+                fig.pitch.add(t + phrase * 0.4, rng.uniform(8, 22))
+                if rng.random() < 0.35 and t + phrase * 0.8 < b - 0.5:      # a look over at the stage
+                    fig.yaw.add(t + phrase * 0.8, -60)
+                    fig.pitch.add(t + phrase * 0.8, 0)
+            t += phrase
+        fig.L.add(b, rest_l)
+        fig.R.add(b, rest_r)
+        fig.lean.add(b, 14)
+        fig.yaw.add(b, 0)
+        fig.pitch.add(b, 15)
+
+
 PATTERN = dict(
-    wc=[("A", 15, 70), ("SF", 70, 70), ("TM", 150, 70), ("C", 180, 70), ("TF", 240, 70), ("SM", 272, 70)],
-    runs=[("SM", 112), ("SF", 210), ("DF", 290)],
-    bar=[("C", 48), ("B", 92), ("A", 150), ("B", 255), ("C", 292), ("A", 320)],
+    wc=[("A", 15, 70), ("SF", 22, 70), ("TM", 150, 70), ("C", 180, 70), ("SM", 236, 70), ("TF", 240, 70)],
+    runs=[("DF", 24), ("SM", 55), ("SF", 265)],
+    bar=[("C", 48), ("B", 97), ("A", 150), ("B", 255), ("C", 292), ("A", 320)],
 )
 
 
@@ -2621,7 +3133,7 @@ def _waitress(cast, P, pours, report=None, order=None):
     W = Waitress()
     TF, TM = cast["TF"], cast["TM"]
     tub = {k: m for k, m in cast.items() if getattr(m, "tub", False)}
-    others = _others([m.f for m in cast.values()], [("Pno", PNO_SEAT[:2])])
+    others = _others([m.f for m in cast.values()] + [p.f for p in PHANTOMS], [("Pno", PNO_SEAT[:2])])
     f = W.f
 
     def lists():
@@ -2665,7 +3177,8 @@ def _waitress(cast, P, pours, report=None, order=None):
             if not bad:
                 for a, b, who in W.visits[n_vis:]:
                     for m in ((TF, TM) if who == "table" else tuple(tub.values()) if who == "tub" else ()):
-                        if not m.f.free(a - 1.5, b + 1.0):
+                        if not all(b + 1.0 <= p or a - 1.5 >= q for p, q in m.f.busy
+                                   if (p, q) not in m.watching):     # (watching the mime, they can be served)
                             bad, why = True, f"{m.f.tag} away at {a:.1f}s"
             if not bad:
                 break
@@ -2699,7 +3212,10 @@ def _waitress(cast, P, pours, report=None, order=None):
     return W
 
 
-def _people(pattern=None, report=None):
+def _people(pattern=None, report=None, watch=True):
+    """The loop's cast, every trip authored. watch=False: the same night
+    after the mime's finale (cafe_figures), when there is nobody on the stage
+    or at the hot tub to watch: everyone idles through those spells instead."""
     pattern = pattern or PATTERN
     cast = _cast()
     players = _dart_players()
@@ -2733,6 +3249,9 @@ def _people(pattern=None, report=None):
         m.g["events"] += [(t_c + EPS, "hidden", None), (t_s - EPS, "spot", m.spot)]
         pours.append((t_c, t_s, "s" + m.f.tag, m.spot, (m.g["size"], m.g["ale"])))
     _darts_game(players, pours)
+    wrng = random.Random("mime-watch")
+    for key in (WATCHERS if watch else ()):
+        watch_show(cast[key], key, wrng)
     P = Pianist()
     W = _waitress(cast, P, pours, report, pattern.get("wtr"))
     for m in cast.values():
@@ -2765,7 +3284,7 @@ def _people(pattern=None, report=None):
 # --- Scheduler ----------------------------------------------------------------
 def _root_clashes(cast):
     """Glide-path clashes from the root tracks alone (cheap: no IK)."""
-    movers = list(cast.values())
+    movers = list(cast.values()) + PHANTOMS
     for m in movers:
         for k in (m.f.root, m.f.zk, m.f.vis):
             k.done()
@@ -2779,6 +3298,8 @@ def _root_clashes(cast):
                 pts.append((m, Vector((r.x, r.y))))
         for i in range(len(pts)):
             for j in range(i + 1, len(pts)):
+                if isinstance(pts[i][0], _Phantom) and isinstance(pts[j][0], _Phantom):
+                    continue
                 if (pts[i][1] - pts[j][1]).length < 0.45:
                     out.append((t, pts[i][0], pts[j][0]))
         t += 0.25
@@ -2790,6 +3311,9 @@ def _barman_clash(pours):
         if b0 - a1 < 5.0:
             return a1, b0
     return None
+
+
+PLAN_DEBUG = False
 
 
 def _plan(pattern, report):
@@ -2811,15 +3335,39 @@ def _plan(pattern, report):
 
     orders = list(WTR_ORDERS)
     pat["wtr"] = orders.pop(0)
-    for attempt in range(150):
+    nudge = [0]
+    for attempt in range(400):
         try:
             cast, pours = _people(pat, report if attempt == 0 else None)
         except RuntimeError as e:
             if str(e).startswith("barmaid") and orders:
-                report(f"BARMAID: order {pat['wtr']} does not fit ({e}); trying {orders[0]}")
+                if PLAN_DEBUG:
+                    report(f"BARMAID: order {pat['wtr']} does not fit ({e}); trying {orders[0]}")
                 pat["wtr"] = orders.pop(0)
                 continue
-            raise RuntimeError(f"schedule unplannable: {e}")
+            if True:                                 # no order fits (or a refill is lost): move a run, retry
+                key, t_run = pat["runs"][nudge[0] % len(pat["runs"])]
+                nudge[0] += 1
+                shift(key, t_run, ("runs",))
+                if PLAN_DEBUG:
+                    report(f"  barmaid stuck ({e}): runs now {pat['runs']}")
+                orders = list(WTR_ORDERS)
+                pat["wtr"] = orders.pop(0)
+                continue
+        own = None                                   # nobody on two trips at once
+        for key, m in cast.items():
+            tr = sorted((t0, t1, k) for t0, t1, k in getattr(m, "trips", []) if k in ("wc", "run"))
+            for (a0, a1, ka), (b0, b1, kb) in zip(tr, tr[1:]):
+                if b0 < a1 + 4.0:
+                    own = (key, a0 if ka == "run" else b0)
+                    break
+            if own:
+                break
+        if own:
+            shift(own[0], next(t for k, t in pat["runs"] if k == own[0] and abs(t - own[1]) < 1.0), ("runs",))
+            orders = list(WTR_ORDERS)
+            pat["wtr"] = orders.pop(0)
+            continue
         bad = _barman_clash(pours)
         if bad:
             # Move the takeaway run whose pour starts at the clash.
@@ -2834,6 +3382,10 @@ def _plan(pattern, report):
                     break
             if not moved:
                 raise RuntimeError(f"barman double-booked at {bad} and no run to move")
+            if PLAN_DEBUG:
+                report(f"  barman double-booked at {bad}: runs now {pat['runs']}")
+            orders = list(WTR_ORDERS)                # (a new pattern: every barmaid order may fit again)
+            pat["wtr"] = orders.pop(0)
             continue
         clashes = _root_clashes(cast)
         if not clashes:
@@ -2850,9 +3402,13 @@ def _plan(pattern, report):
         if not cands:
             raise RuntimeError(f"{a.f.tag} and {b.f.tag} clash at {t:.1f}s with neither travelling")
         t0, key, kind = max(cands)
+        if PLAN_DEBUG:
+            report(f"  clash {a.f.tag}/{b.f.tag} at {t:.1f}s: shift {key} {kind} {t0:.1f}")
         shift(key, next(item[1] for item in pat["wc" if kind == "wc" else "runs"]
                         if item[0] == key and abs(item[1] - t0) < 1.0), ("wc",) if kind == "wc" else ("runs",))
-    raise RuntimeError("schedule did not settle in 150 shifts")
+        orders = list(WTR_ORDERS)
+        pat["wtr"] = orders.pop(0)
+    raise RuntimeError("schedule did not settle in 400 shifts")
 
 
 def _barman(pours):
@@ -3524,11 +4080,11 @@ def _tub_ball(results, report):
     return arm
 
 # --- Gates --------------------------------------------------------------------
-def _gate_spacing(results, report):
+def _gate_spacing(results, report, length=None):
     """No two people within 0.40 m (hips, horizontal) while both are visible."""
     walkers = [(fig, fr) for fig, _arm, fr, _e in results if fig.tag != "Bm" and not fig.tag.startswith("Bed")]
     bad = []
-    n = int(round(LOOP * FPS))
+    n = int(round((length or LOOP) * FPS))
     for fi in range(0, n + 1, 3):
         t = fi / FPS
         pts = []
@@ -3592,36 +4148,107 @@ def _gate_routes(results, report):
 
 
 # --- Build --------------------------------------------------------------------
+def _done(fig):
+    fig.root.done()
+    fig.zk.done()
+    fig.rq.done()
+    for k in (fig.vis, fig.lean, fig.pitch, fig.yaw, fig.L, fig.R, fig.fL, fig.fR):
+        if k:
+            k.done()
+    if fig.pump is not None:
+        fig.pump.done()
+    for g in fig.glasses:
+        g["fill"].done()
+        g["tilt"].done()
+        g["scale"].done()
+
+
+def _to_nla(arm, names):
+    """Every clip of a figure as its own NLA track (each exports as its own
+    glTF animation)."""
+    ad = arm.animation_data
+    ad.action = None
+    for nm in names:
+        act = bpy.data.actions[nm]
+        tr = ad.nla_tracks.new()
+        tr.name = nm
+        st = tr.strips.new(nm, 0, act)
+        if act.slots:
+            st.action_slot = act.slots[0]
+
+
+def _same_track(a, b, step=0.5):
+    """Do two figures' root tracks agree (the After cast must not move anyone
+    the Loop doesn't)?"""
+    a, b = sorted(a.root, key=lambda kv: kv[0]), sorted(b.root, key=lambda kv: kv[0])
+    t = 0.0
+    while t <= LOOP:
+        if (track(a, t).xy - track(b, t).xy).length > 1e-4:
+            return t
+        t += step
+    return None
+
+
+def plan_only(report=print):
+    """The regulars planned (all three clips' tracks for dinner_figures to
+    keep clear of) without solving or writing anything: for iterating on the
+    dinner and the finale."""
+    global PLANNED, PLANNED_SHOW, PLANNED_AFTER
+    cast, pours, pat = _plan(PATTERN, report)
+    figs = [m.f for m in cast.values()] + [_barman(pours)]
+    acast, _apours = _people(pat, None, watch=False)
+    PLANNED = list(figs)
+    PLANNED_AFTER = [next((m.f for m in acast.values() if m.f.tag == f.tag and f.tag in AFTER_TAGS), f) for f in figs]
+    PLANNED_SHOW = _show_people(figs, report)
+    return figs
+
+
 def build(report=print, only=None, strict=True):
     sc = bpy.context.scene
     sc.render.fps = FPS
     sc.render.fps_base = 1.0
-    global PLANNED
-    cast, pours, _pat = _plan(PATTERN, report)
+    global PLANNED, PLANNED_SHOW, PLANNED_AFTER
+    cast, pours, pat = _plan(PATTERN, report)
     figs = [m.f for m in cast.values()] + [_barman(pours)] + _bedroom()
     PLANNED = list(figs)                   # dinner_figures keeps its party out of their way (root tracks)
+    # After the finale: the same night, nobody watching (the same trips).
+    acast, apours = _people(pat, None, watch=False)
+    if [p[:3] for p in apours] != [p[:3] for p in pours]:
+        raise RuntimeError("the After cast's pours differ from the loop's")
+    after = {}
+    for key, m in acast.items():
+        lf = cast[key].f
+        bad = _same_track(lf, m.f)
+        if m.f.tag in AFTER_TAGS:
+            after[m.f.tag] = m.f
+        elif bad is not None:
+            raise RuntimeError(f"{m.f.tag} moves differently after the finale (at {bad:.1f}s)")
+    show = {f.tag: f for f in _show_people(figs, report)}
+    PLANNED_AFTER = [after.get(f.tag, f) for f in figs]
+    PLANNED_SHOW = list(show.values())
     if only:
         figs = [f for f in figs if f.tag in only]
-    results = []
+    results, extra = [], []
     for fig in figs:
-        fig.root.done()
-        fig.zk.done()
-        fig.rq.done()
-        for k in (fig.vis, fig.lean, fig.pitch, fig.yaw, fig.L, fig.R, fig.fL, fig.fR):
-            if k:
-                k.done()
-        if fig.pump is not None:
-            fig.pump.done()
-        for g in fig.glasses:
-            g["fill"].done()
-            g["tilt"].done()
-            g["scale"].done()
+        _done(fig)
         arm, frames, err = _realise(fig, report)
         results.append((fig, arm, frames, err))
+        clips = []
+        for suffix, var in (("Show", show.get(fig.tag)), ("After", after.get(fig.tag))):
+            if var is None:
+                continue
+            _done(var)
+            var.R0 = fig.R0
+            _a, vframes, verr = _realise(var, report, arm, fig.poles, suffix)
+            extra.append((var, arm, vframes, verr, suffix))
+            clips.append(suffix)
+        if clips:
+            _to_nla(arm, [f"Fig_{fig.tag}Loop"] + [f"Fig_{fig.tag}{c}" for c in clips])
     _bed_duvet(results, report)
     _tub_ball(results, report)
     ok = _gate_spacing(results, report) & _gate_routes(results, report)
-    worst = max(e for *_x, e in results)
+    ok &= _gate_spacing([(f, a, fr, e) for f, a, fr, e, sfx in extra if sfx == "Show"], report, FINALE_LEN)
+    worst = max([e for *_x, e in results] + [e for *_x, e, _s in extra])
     if worst > 0.006:
         report(f"CONTACT GATE: worst glass contact {worst * 1000:.1f} mm")
         ok = False

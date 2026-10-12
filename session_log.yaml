@@ -1,11 +1,11 @@
 meta:
-  last_updated: '2026-10-08'
+  last_updated: '2026-10-12'
   purpose: Operational continuity for the private Quest lounge
 current_state:
-  active_task: 'Hot tub regulars + Café du Parc (couple, mime, espresso service)'
+  active_task: 'Rovers stage (NW corner by the Gents) and the mime finale: lights down, spotlight, 7 acts, café couple and dinner party watch, then he mingles'
   status: complete
-  next_action: 'Jay to check in the headset: hot tub (ball games, barmaid cocktail run ~105-180 s into each 6-min Rovers loop), café mime acts (juggling, mime, unicycle; Rovers red with the shelf couple in the after-dinner loop), chef/W1 espresso runs.'
-  summary: 'Deployed 2026-10-08 (release 1791437175653): hot tub cast in rovers_figures (TubA/B/S, Fig_TubBall, barmaid job_tub) and the café in cafe_figures on the dinner session clock (couple, mime, chef + W1 espressos); lounge loop now 1440 s. All gates pass on real geometry.'
+  next_action: 'Jay to check in the headset: finale at session 54:00-66:00 (lights dim 54:20, acts: box, knives incl one-handed, one-hand balls, rola bola with fire, fire eating, bouquet to the café lady, bubbles; lights up ~63:30). Couple seated at the cabaret table from ~50 min; window table left free.'
+  summary: 'Stage + cabaret table built from rovers_figures constants; regulars have Loop/Show/After session cue clips; DinCafeProps_Show bone drives client dimming and Light_G spot. All gates pass; deployed 2026-10-12.'
 pending_tasks:
 - task: 'Voice server rejects new room connections: mediasoup no more available ports (32 UDP attempts), also fails force_tcp. Occurred before and after the scene release; active transports
     observed, service not restarted. Diagnose before multiplayer acceptance.'
@@ -23,13 +23,13 @@ pending_tasks:
     viewpoint behavior.'
   priority: low
 session_history:
+- date: '2026-10-12'
+  summary: 'Rovers stage + mime finale (lights down, spotlight, knives, one-hand juggling, fire rola bola, fire eating, bouquet, bubbles); darts players turn to watch; café couple moves to the Rovers; RW waits on them; deployed.'
+- date: '2026-10-10'
+  summary: 'Sessions now start on the Rovers phase (client): mime does a Rovers act every 6 min from the first second; mime routine replaced by rola bola (board+roller, juggling clubs on it); rides unicycle indoors (hall, kitchen corridor, round the dining table; to the dinner table); also café/Rovers/tub doing torches, clubs, magic every round; Rovers crowd gathers; Rovers barmaid does café coffee and wiping; deployed.'
+- date: '2026-10-09'
+  summary: 'Mime never rests: tour of café/dining/snug/tub numbers (clubs, fire, magic, unicycle juggling); Rovers barmaid serves dinner party; staff drink in kitchen; deployed.'
 - date: '2026-10-08'
   summary: 'Hot tub regulars + Café du Parc (couple, mime 3 acts + Rovers red, chef/W1 espressos; lounge 1440 s); deployed; all three repos pushed (lounge branch).'
 - date: '2026-10-07'
   summary: 'Planters: stripped the curtain sliver the house-plant copy dragged (9 plants); after-dinner Rovers move shipped; deployed.'
-- date: '2026-10-06'
-  summary: 'Cocktail lounge floor shimmer: old sectional leg pads/base slabs left at z 0 (delete box started at 0.0) removed; gates pass; deployed.'
-- date: '2026-10-05'
-  summary: 'Patio -> cocktail lounge (bar, lounge sets, high tables), French door from dining, dinner ends there with mingling groups; route gates catch walls; deployed.'
-- date: '2026-10-04'
-  summary: 'Rovers barmaid + Jay''s reserved table + piano stout, darts fill the loop with bar/toilet trips (old game idled 68 s); route gates now catch walls; deployed.'

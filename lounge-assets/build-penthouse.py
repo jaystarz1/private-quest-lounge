@@ -3584,7 +3584,10 @@ for nm, z1, z2, mat in (("DadoCap", WZ0 - 0.02, WZ0 + 0.03, M_RV_MAHOG), ("Pictu
     _cc = local_pt(CH_C, CH_YAW, 0.0, -0.15 - 0.0125)
     rv_rbox(f"RvShell{nm}C", _cc, CH_YAW, -_cl / 2, _cl / 2, -0.0125, 0.0125, z1, z2, mat)
 # Window stools inside (mahogany inner sills).
+import rovers_figures as RVF
 for k, (x1, x2) in enumerate(WIN_N):
+    if k == 0:                                     # (the stage drapes cover its west part)
+        x1 = RVF.STAGE_POLY[1][0] + 0.05
     rv_box(f"RvShellStoolN{k}", x1 - 0.05, x2 + 0.05, RV_IY2 - 0.06, RV_Y2 - RV_T / 2 - 0.04, WZ0, WZ0 + 0.04, M_RV_MAHOG)
 for k, (y1, y2) in enumerate(WIN_E):
     rv_box(f"RvShellStoolE{k}", RV_IX2 - 0.06, RV_X2 - RV_T / 2 + 0.04, y1 - 0.05, y2 + 0.05, WZ0, WZ0 + 0.04, M_RV_MAHOG)
@@ -3721,10 +3724,110 @@ for k, (x, y) in enumerate(BAR_STOOLS):
     if k in (0, 4):
         continue
     rv_stool(f"B{k}", x, y, 0.75, r=0.18)
-# Drinking shelf under the window west of the lobby (the stand-up end).
-rv_box("RvFurnShelf", -3.55, PX1 - 0.30, RV_IY2 - 0.28, RV_IY2, 1.05, 1.09, M_RV_MAHOG)
-for k, x in enumerate((-3.35, -1.85)):
+# Drinking shelf under the window west of the lobby (the stand-up end), east
+# of the stage now (rovers_figures SHELF_X).
+import rovers_figures as RVF
+rv_box("RvFurnShelf", RVF.SHELF_X[0], RVF.SHELF_X[1], RV_IY2 - 0.28, RV_IY2, 1.05, 1.09, M_RV_MAHOG)
+for k, x in enumerate((RVF.SHELF_X[0] + 0.12, RVF.SHELF_X[1] - 0.12)):
     rv_box(f"RvFurnShelfBracket{k}", x - 0.02, x + 0.02, RV_IY2 - 0.24, RV_IY2, 0.85, 1.05, M_RV_IRON)
+
+# --- The stage: the stand-up corner between the Gents and the front window ----
+# Jay: a small stage for the mime, to the right of the Gents in the stand-up
+# area; his finale plays there with the pub lights down and a spotlight on him.
+# A 0.30 m platform of boards on a mahogany skirt with a brass nosing, its
+# front corner cut on the diagonal to face the room and a step along the cut;
+# red velvet drapes on the two walls behind it under a gold-fringed pelmet;
+# footlights along the front; a theatre spotlight hung from the ceiling over the
+# floor (the beam is the café prop rig's, the light is Light_G in the client).
+# His prop table (a knife block) and the bubble bucket stand at the back.
+M_RV_CURTAIN = mk('RoversStageDrape', '6A0C16', 0.95)
+M_RV_FRINGE = mk('RoversStageFringe', 'C9A24A', 0.55, 0.3)
+M_RV_STGLOW = mk('RoversStageLamp', 'FFF2D8', 0.4)
+_sgb = M_RV_STGLOW.node_tree.nodes['Principled BSDF']
+_sgb.inputs['Emission Color'].default_value = (1.0, 0.86, 0.62, 1)
+_sgb.inputs['Emission Strength'].default_value = 3.0
+M_RV_BUCKET = mk('RoversStageBucket', 'A3A8AE', 0.35, 0.5)
+M_RV_SOAP = mk('RoversStageSoap', 'D8ECF2', 0.15)
+_sp = RVF.STAGE_POLY
+rv_prism("RvStageSkirt", _sp, RV_FZ - 0.01, RVF.STAGE_TOP - 0.03, M_RV_MAHOG, 0.6)
+rv_prism("RvStageBoards", _sp, RVF.STAGE_TOP - 0.03, RVF.STAGE_TOP, M_RV_BOARDS, 1.0)
+rv_prism("RvStageStep", RVF.STAGE_STEP, RV_FZ - 0.01, RVF.STEP_TOP, M_RV_MAHOG, 0.6)
+# Brass nosing round the open edges (east, the cut, south) and on the step.
+for k, (a, b) in enumerate(((_sp[1], _sp[2]), (_sp[2], _sp[3]), (_sp[3], _sp[4]),
+                            (RVF.STAGE_STEP[3], RVF.STAGE_STEP[2]))):
+    z = RVF.STEP_TOP if k == 3 else RVF.STAGE_TOP
+    L = math.hypot(b[0] - a[0], b[1] - a[1])
+    yaw = math.atan2(b[1] - a[1], b[0] - a[0])
+    rv_rbox(f"RvStageNosing{k}", ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2), yaw, -L / 2, L / 2, -0.012, 0.012,
+            z - 0.035, z + 0.004, M_RV_BRASS)
+# Drapes: a backing sheet on each wall and pleats in front of it.
+rv_box("RvStageDrapeN", RV_IX1, _sp[1][0], RV_IY2 - 0.035, RV_IY2 - 0.005, RVF.STAGE_TOP, 2.70, M_RV_CURTAIN)
+rv_box("RvStageDrapeW", RV_IX1 + 0.005, RV_IX1 + 0.035, _sp[4][1], RV_IY2, RVF.STAGE_TOP, 2.70, M_RV_CURTAIN)
+_x = RV_IX1 + 0.10
+k = 0
+while _x < _sp[1][0] - 0.04:
+    rv_cyl(f"RvStagePleatN{k}", _x, RV_IY2 - 0.05, (RVF.STAGE_TOP + 2.70) / 2, 0.045, 2.70 - RVF.STAGE_TOP,
+           M_RV_CURTAIN, verts=8)
+    _x += 0.11
+    k += 1
+_y = _sp[4][1] + 0.06
+k = 0
+while _y < RV_IY2 - 0.10:
+    rv_cyl(f"RvStagePleatW{k}", RV_IX1 + 0.05, _y, (RVF.STAGE_TOP + 2.70) / 2, 0.045, 2.70 - RVF.STAGE_TOP,
+           M_RV_CURTAIN, verts=8)
+    _y += 0.11
+    k += 1
+# Pelmet with a gold fringe over both drapes.
+rv_box("RvStagePelmetN", RV_IX1, _sp[1][0] + 0.06, RV_IY2 - 0.16, RV_IY2, 2.70, 2.98, M_RV_CURTAIN)
+rv_box("RvStagePelmetW", RV_IX1, RV_IX1 + 0.16, _sp[4][1] - 0.06, RV_IY2, 2.70, 2.98, M_RV_CURTAIN)
+rv_box("RvStageFringeN", RV_IX1, _sp[1][0] + 0.06, RV_IY2 - 0.165, RV_IY2 - 0.155, 2.64, 2.72, M_RV_FRINGE)
+rv_box("RvStageFringeW", RV_IX1 + 0.155, RV_IX1 + 0.165, _sp[4][1] - 0.06, RV_IY2 - 0.16, 2.64, 2.72, M_RV_FRINGE)
+# Footlights: little brass hoods with a glowing bulb, along the cut and the east edge.
+_feet = [(_sp[2][0] + (_sp[3][0] - _sp[2][0]) * u, _sp[2][1] + (_sp[3][1] - _sp[2][1]) * u) for u in (0.25, 0.75)]   # (he steps up between them)
+_feet += [(_sp[1][0] - 0.05, -10.30), (_sp[1][0] - 0.05, -10.52), (-3.20, _sp[4][1] + 0.05), (-3.55, _sp[4][1] + 0.05)]
+for k, (x, y) in enumerate(_feet):
+    rv_cyl(f"RvStageFootHood{k}", x, y, RVF.STAGE_TOP + 0.025, 0.035, 0.05, M_RV_BRASS, verts=8)
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=8, ring_count=4, radius=0.022,
+                                         location=(x, y, RVF.STAGE_TOP + 0.06))
+    bpy.context.active_object.name = f"RvStgGlowFoot{k}"
+    bpy.context.active_object.data.materials.append(M_RV_STGLOW)
+# His prop table at the back (iron stand, mahogany top, a knife block on it)
+# and the bubble bucket (soap in it).
+_tx, _ty = RVF.STAGE_TABLE
+rv_cyl("RvStageTableTop", _tx, _ty, RVF.STAGE_TABLE_TOP - 0.015, 0.17, 0.03, M_RV_MAHOG, verts=14)
+rv_cyl("RvStageTableStem", _tx, _ty, (RVF.STAGE_TOP + RVF.STAGE_TABLE_TOP) / 2, 0.02,
+       RVF.STAGE_TABLE_TOP - RVF.STAGE_TOP - 0.03, M_RV_IRON, verts=6)
+rv_cyl("RvStageTableFoot", _tx, _ty, RVF.STAGE_TOP + 0.015, 0.12, 0.03, M_RV_IRON, verts=10)
+rv_box("RvStageKnifeBlock", _tx - 0.07, _tx + 0.07, _ty - 0.05, _ty + 0.05, RVF.STAGE_TABLE_TOP,
+       RVF.STAGE_TABLE_TOP + 0.11, M_RV_MAHOG)
+_bx, _by = RVF.BUCKET
+rv_cyl("RvStageBucket", _bx, _by, (RVF.STAGE_TOP + RVF.BUCKET_TOP) / 2, 0.12, RVF.BUCKET_TOP - RVF.STAGE_TOP,
+       M_RV_BUCKET, verts=14)
+rv_cyl("RvStageBucketRim", _bx, _by, RVF.BUCKET_TOP - 0.006, 0.126, 0.012, M_RV_BUCKET, verts=14)
+rv_cyl("RvStageSoap", _bx, _by, RVF.BUCKET_TOP - 0.04, 0.112, 0.004, M_RV_SOAP, verts=14)
+# The spotlight: a black lantern on a yoke from the ceiling, aimed at his spot.
+_L = RVF.SPOT_LAMP
+_aim = Vector((RVF.MIME_PUB[0], RVF.MIME_PUB[1], RVF.STAGE_TOP + 1.2)) - _L
+_rot = _aim.to_track_quat('Z', 'Y').to_euler()
+rv_cyl("RvStageSpotBody", *(_L - _aim.normalized() * 0.20), 0.09, 0.34, M_RV_BLACK, verts=12, rot=tuple(_rot))
+rv_cyl("RvStageSpotLens", *(_L - _aim.normalized() * 0.025), 0.075, 0.02, M_RV_STGLOW, verts=12, rot=tuple(_rot))
+rv_cyl("RvStageSpotRod", _L.x, _L.y, (_L.z + RV_CZ) / 2 + 0.06, 0.012, RV_CZ - _L.z - 0.10, M_RV_BLACK, verts=6)
+
+# --- The café couple's table, front row (cafe_figures: they come over from the
+# café after the dinner party moves into the Rovers) ------------------------
+M_RV_CHAIR = mk('RoversChairWood', '3A1C10', 0.55)
+_cx, _cy = RVF.CAB_TABLE
+rv_cyl("RvFurnCabTop", _cx, _cy, RVF.CAB_TOP - 0.015, 0.26, 0.03, M_RV_COPPER, verts=16)
+rv_cyl("RvFurnCabStem", _cx, _cy, (RV_FZ + RVF.CAB_TOP) / 2, 0.035, RVF.CAB_TOP - RV_FZ - 0.03, M_RV_IRON, verts=8)
+rv_cyl("RvFurnCabFoot", _cx, _cy, RV_FZ + 0.02, 0.19, 0.04, M_RV_IRON, verts=12)
+for who, (x, y) in RVF.CAB_CHAIRS.items():
+    yaw = math.radians(RVF.CAB_YAW[who])
+    s = RVF.CAB_SEAT
+    rv_rbox(f"RvFurnCabSeat{who}", (x, y), yaw, -0.20, 0.20, -0.20, 0.20, s - 0.06, s, M_RV_VELOUR, 0.4)
+    for lx, ly in ((-0.17, -0.17), (0.17, -0.17), (-0.17, 0.17), (0.17, 0.17)):
+        rv_rbox(f"RvFurnCabLeg{who}{lx:+.0f}{ly:+.0f}", local_pt((x, y), yaw, lx, ly), yaw, -0.017, 0.017,
+                -0.017, 0.017, RV_FZ, s - 0.06, M_RV_CHAIR)
+    rv_rbox(f"RvFurnCabBack{who}", (x, y), yaw, -0.19, 0.19, -0.21, -0.18, s, s + 0.42, M_RV_CHAIR)
 
 # --- Darts at the rear of the right-hand wall, piano, boards, pendants -------
 # Moved 0.45 m east of the piano stool so the throwing lane clears the pianist
@@ -3806,6 +3909,8 @@ join_objects("RoversFront", ("RvExt",))
 join_objects("RoversBar", ("RvBar",))
 join_objects("RoversFurniture", ("RvFurn",))
 join_objects("RoversGlow", ("RvGlow",))
+join_objects("RoversStage", ("RvStage",))
+join_objects("RoversStageGlow", ("RvStgGlow",))
 join_objects("RoversRoof", ("RvRoof", "RvDenDoor"))
 join_objects("RoversRails", ("RvRail",))
 
