@@ -199,7 +199,9 @@ SERVES = {"W1": (1, 2, 4), "W2": (5, 6, 8)}  # whose drinks each waiter carries 
 # sips after their last top-up, which keeps the glasses level at the seam).
 RW_ROUNDS = [(8.0, "red", (1, 5)), (58.0, "white", (2,)), (245.0, "whisky", (4, 6, 8)), (600.0, "red", (1, 5)),
              (650.0, "white", (2,)), (960.0, "whisky", (4, 6, 8)), (1318.0, "red", (1, 5)), (1366.0, "white", (2,))]
-WC_LOUNGE = [(4, 10.0), (1, 300.0), (5, 315.0), (2, 335.0), (6, 670.0), (8, 690.0), (2, 1000.0), (1, 1040.0)]
+WC_LOUNGE = [(4, 4.0), (1, 20.0), (5, 364.0), (2, 380.0), (6, 724.0), (8, 740.0), (2, 1084.0), (1, 1100.0)]
+# (first thing in a round, back before the café mime gets to the snug on his
+# round of the tables, tables.py)
 GATHER_LEAD = 4.0                            # the first one up as he comes in (this long before his act)
 GATHER_STAY = 6.0                            # they stay on after his bow while he goes out round them
 GATHER_ORDER = (4, 8, 2, 6, 1, 5)            # out of the snug in this order, to the far end of the arc first
@@ -256,20 +258,22 @@ UNDER_BAR = Vector((0.12, 0.30, 0.62))       # her hand down to the glass shelf 
 # tables wiped down while it is empty, the bar top wiped with her towel.
 RW_DINNER = [(300.0, "coffee"), (620.0, "wipe"), (900.0, "coffee"), (1150.0, "wipe"), (1500.0, "coffee"),
              (1800.0, "wipe"), (2100.0, "coffee"), (2420.0, "wipe"), (2650.0, "coffee")]
-# The finale (cafe_figures): the party come out of the snug and stand round the
-# café couple's table in front of the stage, the far ones first (each: their
-# spot, the way past the others to it).
-FINALE_STAND = {4: ((-3.20, -12.45), [(-1.40, -12.85), (-3.05, -12.85)]),
-                8: ((-2.80, -12.88), [(-1.40, -12.88)]),
-                2: ((-2.30, -12.85), [(-1.40, -12.85)]),
-                6: ((-1.75, -12.72), []),
-                1: ((-1.30, -12.30), []),
-                5: ((-1.02, -11.82), [])}
-# The Rovers barmaid at the café couple's table (beside it, east), the way
-# there from her end of the bar along the hall line.
-RW_AT_CAB = (-1.86, -11.72)
+# The finale (cafe_figures): the party come out of the snug and stand in two
+# rows in front of the stage, the front row first (each: their spot, the way
+# past the others to it along the hall line), leaving the floor from the step
+# to the booths clear for his way to the café lady.
+FINALE_STAND = {4: ((-3.10, -12.05), [(-1.40, -12.85), (-3.10, -12.85)]),
+                8: ((-2.55, -12.05), [(-1.40, -12.85), (-2.55, -12.85)]),
+                2: ((-2.00, -12.05), [(-1.40, -12.85), (-2.00, -12.85)]),
+                6: ((-2.85, -12.55), [(-1.40, -12.85), (-2.85, -12.85)]),
+                1: ((-2.30, -12.55), [(-1.40, -12.85), (-2.30, -12.85)]),
+                5: ((-1.75, -12.55), [(-1.40, -12.85)])}
+# The Rovers barmaid at the café couple's table (in the gap west of it, between
+# it and the blonde lady's), the way there from her end of the bar along the
+# hall line and up between the booth stools.
+RW_AT_CAB = (1.58, -11.08)
 CAFE_LEAVE = 2990.0                                  # the café couple get up no earlier (the mime has left the café)
-RW_TO_CAB = [(3.90, HALL_Y), (0.30, HALL_Y), (-1.10, -12.55), RW_AT_CAB]
+RW_TO_CAB = [(3.90, HALL_Y), (1.58, HALL_Y), (1.58, -12.35), RW_AT_CAB]
 POLISH_SPOT = Vector((5.12, -14.28, BAR_Z))           # the glass she polishes between jobs, on the bar
 RW_COUPLE_TOPUPS = (420.0, 1130.0)                   # the lounge loop: their glasses topped up
 RW_COFFEE = (320.0, 1040.0)                  # the lounge loop's espressos (an even number: the same cups at the seam)
@@ -3312,7 +3316,10 @@ def done_all(fig):
             k.done()
 
 
-def solve(fig, arm, poles):
+def solve(fig, arm, poles, frames=None):
+    """Solve fig on arm for every frame (frames: (first, last) only; the record
+    outside them repeats its ends)."""
+    lo, hi = frames or (0, N)
     sc = bpy.context.scene
     pb = arm.pose.bones
     p = fig.tag + "_"
@@ -3350,7 +3357,7 @@ def solve(fig, arm, poles):
                yaw=np.empty(N + 1), pos=np.empty((N + 1, 3)), target={"L": np.empty((N + 1, 3)), "R": np.empty((N + 1, 3))},
                vis=np.array(sample(fig.vis), float) if fig.vis else np.ones(N + 1))
     R0 = fig.R0
-    for fi in range(N + 1):
+    for fi in range(lo, hi + 1):
         r = S["root"][fi]
         pos = Vector((r.x, r.y, S["zk"][fi]))
         R3 = Matrix.Rotation(math.radians(r.z), 3, 'Z')
@@ -3391,6 +3398,17 @@ def solve(fig, arm, poles):
         bpy.data.objects.remove(o)
     for b in arm.pose.bones:
         b.matrix_basis = Matrix.Identity(4)
+    if lo > 0 or hi < N:                         # (outside the window: its ends held)
+        def pad(a):
+            a[:lo] = a[lo]
+            a[hi + 1:] = a[hi]
+        for v in M.values():
+            pad(v)
+        for k in ("palm", "hand", "target"):
+            for side in "LR":
+                pad(rec[k][side])
+        pad(rec["yaw"])
+        pad(rec["pos"])
     return M, rec
 
 
@@ -3432,14 +3450,17 @@ def _write_rows(cb, bone, path, rows, tol, default):
     return len(keep)
 
 
-def write_fig(fig, arm, M, clip, vis=None):
+def write_fig(fig, arm, M, clip, vis=None, frames=None):
+    """frames: (first, last): only those, the clip starting at the first."""
     cb = _channelbag(arm, f"Fig_{fig.tag}{clip}")
     kept = 0
     per = {}
+    lo, hi = frames or (0, N)
     if vis is not None:                          # out of sight (the loo): the whole figure scaled away
-        kept += _write_rows(cb, f"{fig.tag}_Root", "scale", np.repeat(np.asarray(vis, float)[None, :], 3, 0),
-                            0.002, (1, 1, 1))
+        kept += _write_rows(cb, f"{fig.tag}_Root", "scale",
+                            np.repeat(np.asarray(vis, float)[None, lo:hi + 1], 3, 0), 0.002, (1, 1, 1))
     for name, mats in M.items():
+        mats = mats[lo:hi + 1]
         locs = mats[:, :3, 3]
         q = mats_to_quats(mats[:, :3, :3])
         for i in range(1, len(q)):
@@ -3817,50 +3838,59 @@ def write_props(props, arm, REC, report, clip):
 
 
 # --- Gates --------------------------------------------------------------------
-def gate_targets(recs, report):
+def gate_targets(recs, report, window=None, only=None, label="DINNER"):
     """A hand target that jumps in one frame means two actions overlap."""
     ok = True
+    lo, hi = window or (0, N)
     for tag, R in recs.items():
+        if only and tag != only:
+            continue
         for side in ("L", "R"):
-            d = np.linalg.norm(np.diff(R["target"][side], axis=0), axis=1)
+            d = np.zeros(N)
+            d[lo:hi] = np.linalg.norm(np.diff(R["target"][side][lo:hi + 1], axis=0), axis=1)
             if d.max() > 0.15:
                 over = np.nonzero(d > 0.15)[0]
                 spots = [over[0]] + [b for a, b in zip(over, over[1:]) if b - a > FPS]
                 more = ", ".join(f"{d[i]:.2f} m at {i / FPS:.1f}s" for i in spots[:8])
-                report(f"DINNER TARGET GATE: {tag}.{side} target jumps {d.max():.2f} m at {d.argmax() / FPS:.1f}s ({more})")
+                report(f"{label} TARGET GATE: {tag}.{side} target jumps {d.max():.2f} m at {d.argmax() / FPS:.1f}s ({more})")
                 ok = False
     return ok
 
 
-def gate_spacing(recs, report, rovers_from=None, lounge=False):
+def gate_spacing(recs, report, rovers_from=None, lounge=False, window=None, only=None, label="DINNER"):
     """Nobody too close to anyone (while both are visible); with rovers_from,
-    nobody within 0.40 m of a Rovers regular from then on (phase-locked)."""
+    nobody within 0.40 m of a Rovers regular from then on (phase-locked).
+    window/only: those frames, pairs with that figure."""
     staff = [t for t in recs if t in (WAITER_TAG["W1"], WAITER_TAG["W2"], RW_TAG, CHEF_TAG)]
     guests = [t for t in recs if t not in staff]
     vis = {t: recs[t]["vis"] > 0.5 for t in recs}
     bad = {}
-    for fi in range(0, N + 1, 3):
+    lo, hi = window or (0, N)
+    pair = lambda a, b: not only or only in (a, b)
+    for fi in range(lo, hi + 1, 3):
         for i, a in enumerate(staff):
             pa = recs[a]["pos"][fi, :2]
             for b in staff[i + 1:]:
                 d = np.linalg.norm(pa - recs[b]["pos"][fi, :2])
-                if d < 0.45:
+                if d < 0.45 and pair(a, b):
                     bad.setdefault((a, b), (fi / FPS, d))
             for b in guests:
                 d = np.linalg.norm(pa - recs[b]["pos"][fi, :2])
-                if d < 0.34 and vis[b][fi]:
+                if d < 0.34 and vis[b][fi] and pair(a, b):
                     bad.setdefault((a, b), (fi / FPS, d))
         for i, a in enumerate(guests):
             for b in guests[i + 1:]:
                 d = np.linalg.norm(recs[a]["pos"][fi, :2] - recs[b]["pos"][fi, :2])
-                if d < 0.38 and vis[a][fi] and vis[b][fi]:
+                if d < 0.38 and vis[a][fi] and vis[b][fi] and pair(a, b):
                     bad.setdefault((a, b), (fi / FPS, d))
     if rovers_from is not None:
         step = 1.0 / FPS
-        fis = np.arange(int(math.ceil(rovers_from * FPS)), N + 1, 3)
+        fis = np.arange(max(lo, int(math.ceil(rovers_from * FPS))), hi + 1, 3)
         for mask, rv, idx in rovers_spans(fis / FPS, step, lounge):
             for tag, xy, v in rv:
                 for a in recs:
+                    if only and a != only:
+                        continue
                     ok = mask & v[idx] & vis[a][fis]
                     if not ok.any():
                         continue
@@ -3869,12 +3899,13 @@ def gate_spacing(recs, report, rovers_from=None, lounge=False):
                     if len(hit):
                         bad.setdefault((a, "Rovers " + tag), (fis[hit[0]] / FPS, d[hit[0]]))
     for (a, b), (t, d) in bad.items():
-        report(f"DINNER SPACING GATE: {a} and {b} {d:.2f} m apart at {t:.1f}s")
+        report(f"{label} SPACING GATE: {a} and {b} {d:.2f} m apart at {t:.1f}s")
     return not bad
 
 
-def gate_routes(recs, report):
+def gate_routes(recs, report, window=None, only=None, label="DINNER"):
     sc = bpy.context.scene
+    lo, hi = window or (0, N)
     if not bpy.data.objects.get("DiningTable"):
         report("DINNER ROUTE GATE: skipped (no dining room geometry in this scene)")
         return True
@@ -3887,8 +3918,10 @@ def gate_routes(recs, report):
     dg = bpy.context.evaluated_depsgraph_get()
     bad = {}
     for tag in recs:
+        if only and tag != only:
+            continue
         pos = recs[tag]["pos"]
-        for fi in range(2, N + 1, 2):
+        for fi in range(lo + 2, hi + 1, 2):
             a, b = pos[fi - 2], pos[fi]
             fz = floor_z(b[0], b[1])
             if np.linalg.norm(b[:2] - a[:2]) < 0.004 or abs(b[2] - fz) > 0.012 or abs(a[2] - b[2]) > 0.02:
@@ -3911,7 +3944,7 @@ def gate_routes(recs, report):
     for o in hidden:
         o.hide_viewport = False
     for tag, (t, ob, loc) in bad.items():
-        report(f"DINNER ROUTE GATE: {tag} walks into {ob} at {loc} ({t:.1f}s)")
+        report(f"{label} ROUTE GATE: {tag} walks into {ob} at {loc} ({t:.1f}s)")
     return not bad
 
 
@@ -4042,6 +4075,26 @@ def to_nla(arm, names):
             st.action_slot = act.slots[0]
 
 
+def author_night(cr, night):
+    """The mime of cr authored again with another night's finale (on the
+    authoring timeline, as plan() did): the evening before it is the same, and
+    so is the gift to the café lady (her side is in the one dinner clip)."""
+    base, keep = cr.mime, LOOP
+    set_clip(12 * PHASE)
+    try:
+        mk = CF.Mime(LOOP)
+        cr.mime = mk
+        CF.author_dinner(cr, cr.La, cr.D, random.Random("mime-dinner"), night)
+        CF.close_mime(mk, cr.D)
+        CF.bouquet_props(mk)
+    finally:
+        cr.mime = base
+        set_clip(keep)
+    if mk.gift != base.gift or abs(mk.bouquet_down - base.bouquet_down) > 1e-6:
+        raise RuntimeError(f"finale {night}: the gift is not at the base night's moment ({mk.gift} / {base.gift})")
+    return mk
+
+
 def build(report=print, strict=True):
     import time
     t_start = time.time()
@@ -4069,9 +4122,22 @@ def build(report=print, strict=True):
                    REC_D[t]["palm"]["R"][-1].copy()) for t in REC_D}
     total = 0
     last_d = {}
+    # The mime's dinner clip stops where the finale starts: every night's finale
+    # (cafe_figures NIGHTS) is a clip of its own, the base night's from this solve.
+    mt = CF.TAGS["M"]
+    FF = int(round(RF.FINALE_AT * FPS))
+    fin = {}                                     # night -> (clip name, first frame's mats, last frame's mats, props)
+    fin_name = lambda night: f"Fin{night.title()}"
     for fig in figs_d:
         M = {k: v.astype(np.float64) for k, v in MATS[fig.tag].items()}
-        kept = write_fig(fig, RIGS[fig.tag][0], M, "Dinner", REC_D[fig.tag]["vis"])
+        if fig.tag == mt:
+            kept = write_fig(fig, RIGS[fig.tag][0], M, "Dinner", REC_D[fig.tag]["vis"], frames=(0, FF))
+            kept += write_fig(fig, RIGS[fig.tag][0], M, fin_name(CF.BASE_NIGHT), REC_D[fig.tag]["vis"],
+                              frames=(FF, N))
+            fin[CF.BASE_NIGHT] = [{k: v[FF] for k, v in M.items()}, {k: v[-1] for k, v in M.items()}, None]
+            mime_seam = {k: v[FF] for k, v in M.items()}
+        else:
+            kept = write_fig(fig, RIGS[fig.tag][0], M, "Dinner", REC_D[fig.tag]["vis"])
         last_d[fig.tag] = {k: v[-1] for k, v in M.items()}
         total += kept
         report(f"FIGURE {fig.tag}Dinner: {N + 1} frames -> {kept} keys")
@@ -4079,11 +4145,47 @@ def build(report=print, strict=True):
     parm = build_props(crd.P, report)
     done_d = write_props(crd.P, parm, REC_D, report, "Dinner")
     carm = CF.build_rig(report)
-    cafe_d = CF.write_clip(carm, crd.mime, REC_D[CF.TAGS["M"]], "Dinner", report, recs=REC_D)
+    cafe_d = CF.write_clip(carm, crd.mime, REC_D[mt], "Dinner", report, recs=REC_D, frames=(0, FF))
+    fin[CF.BASE_NIGHT][2] = CF.write_clip(carm, crd.mime, REC_D[mt], fin_name(CF.BASE_NIGHT), report, recs=REC_D,
+                                          frames=(FF, N))
     ok = (gate_targets(REC_D, report) & gate_spacing(REC_D, report, 0.0) & gate_routes(REC_D, report) &
           gate_props(crd.P, done_d, REC_D, report, seam=False))
     end_d = {k: (v[0][-1:], v[1][-1:], v[2][-1:]) for k, v in done_d.items()}
-    del done_d, REC_D
+    del done_d
+    # Every other night's finale: the mime authored afresh with that night's
+    # programme (the same evening up to the finale, the same gift to the café
+    # lady), solved over the finale only; his prop rig keyed for it.
+    arm_m, poles_m = RIGS[mt]
+    for night in CF.NIGHTS:
+        if night == CF.BASE_NIGHT:
+            continue
+        mk = author_night(crd, night)
+        done_all(mk.f)
+        mk.f.R0 = crd.mime.f.R0
+        mk.f.loop = D
+        M, rec = solve(mk.f, arm_m, poles_m, frames=(FF, N))
+        recs_k = dict(REC_D)
+        recs_k[mt] = rec
+        kept = write_fig(mk.f, arm_m, M, fin_name(night), rec["vis"], frames=(FF, N))
+        total += kept
+        report(f"FIGURE {mt}{fin_name(night)}: {N - FF + 1} frames -> {kept} keys")
+        props_k = CF.write_clip(carm, mk, rec, fin_name(night), report, recs=recs_k, frames=(FF, N))
+        fin[night] = [{k: v[FF] for k, v in M.items()}, {k: v[-1] for k, v in M.items()}, props_k]
+        lab = f"FINALE {night.upper()}"
+        ok &= (gate_targets(recs_k, report, (FF, N), mt, lab) & gate_spacing(recs_k, report, 0.0, window=(FF, N),
+                                                                              only=mt, label=lab) &
+               gate_routes(recs_k, report, (FF, N), mt, lab))
+        if mk.late:
+            report(f"{lab}: late {mk.late}")
+            ok = False
+        del M, rec, recs_k
+    for night, (first, _last, props) in fin.items():   # every night's finale starts where the dinner clip ends
+        e = max(float(np.abs(first[b] - mime_seam[b]).max()) for b in first)
+        ok &= CF.gate_seam(cafe_d, props, f"dinner / finale {night}", report)
+        if e > 0.10:
+            report(f"FINALE SEAM GATE: {night} starts {e:.3f} off the dinner clip's end")
+            ok = False
+    del REC_D
     report(f"DINNER: {D:.0f}s once per session, {sum(g.bites for g in crd.guests.values())} bites, "
            f"{total} figure keys")
     # --- Lounge: loops after the dinner.
@@ -4107,7 +4209,12 @@ def build(report=print, strict=True):
     MATS.clear()
     done_l = write_props(crl.P, parm, REC_L, report, "Lounge")
     cafe_l = CF.write_clip(carm, crl.mime, REC_L[CF.TAGS["M"]], "Lounge", report, recs=REC_L)
-    ok &= CF.gate(cafe_d, cafe_l, report)
+    ok &= CF.gate(cafe_d, cafe_l, report, fins={n: v[2] for n, v in fin.items()})
+    for night, (_first, last, _props) in fin.items():   # and every night's finale ends where the lounge begins
+        e = max(float(np.abs(last[b] - first_l[mt][b][0]).max()) for b in last)
+        if e > 0.10:
+            report(f"FINALE SEAM GATE: {night} ends {e:.3f} off the lounge clip's start")
+            ok = False
     ok &= (gate_targets(REC_L, report) & gate_spacing(REC_L, report, 0.0, lounge=True) & gate_routes(REC_L, report) &
            gate_props(crl.P, done_l, REC_L, report, seam=True))
     ok &= gate_switch(last_d, first_l, end_d, done_l, report)
@@ -4117,10 +4224,12 @@ def build(report=print, strict=True):
         if max(e) > 0.005:
             report(f"  switch {t}: target L {e[0]:.3f} R {e[1]:.3f} palm R {e[2]:.3f}; dinner R {np.round(a[1], 3)} "
                    f"lounge R {np.round(b[1], 3)}")
+    fins = [fin_name(n) for n in CF.NIGHTS]
     for fig in figs_d:
-        to_nla(RIGS[fig.tag][0], [f"Fig_{fig.tag}Dinner", f"Fig_{fig.tag}Lounge"])
+        mid = [f"Fig_{fig.tag}{c}" for c in fins] if fig.tag == mt else []
+        to_nla(RIGS[fig.tag][0], [f"Fig_{fig.tag}Dinner"] + mid + [f"Fig_{fig.tag}Lounge"])
     to_nla(parm, ["Fig_DinPropsDinner", "Fig_DinPropsLounge"])
-    to_nla(carm, ["Fig_DinCafePropsDinner", "Fig_DinCafePropsLounge"])
+    to_nla(carm, ["Fig_DinCafePropsDinner"] + [f"Fig_DinCafeProps{c}" for c in fins] + ["Fig_DinCafePropsLounge"])
     # The client's cut: inject-hubs reads the linger window off this empty's name.
     if crd.D % PHASE > 1e-6 or LOUNGE_LOOP % PHASE > 1e-6:
         raise RuntimeError(f"dinner {crd.D}s / lounge {LOUNGE_LOOP}s not whole PHASEs")

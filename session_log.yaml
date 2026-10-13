@@ -1,11 +1,11 @@
 meta:
-  last_updated: '2026-10-12'
+  last_updated: '2026-10-13'
   purpose: Operational continuity for the private Quest lounge
 current_state:
-  active_task: 'Rovers stage (NW corner by the Gents) and the mime finale: lights down, spotlight, 7 acts, café couple and dinner party watch, then he mingles'
+  active_task: 'Rovers: bigger stage, couples at their own booth tables (CT beside TT, ST beside Jay), pick-up glasses on Jay''s table, seven nightly mime finales, varied table visits after'
   status: complete
-  next_action: 'Jay to check in the headset: finale at session 54:00-66:00 (lights dim 54:20, acts: box, knives incl one-handed, one-hand balls, rola bola with fire, fire eating, bouquet to the café lady, bubbles; lights up ~63:30). Couple seated at the cabaret table from ~50 min; window table left free.'
-  summary: 'Stage + cabaret table built from rovers_figures constants; regulars have Loop/Show/After session cue clips; DinCafeProps_Show bone drives client dimming and Light_G spot. All gates pass; deployed 2026-10-12.'
+  next_action: 'Jay to check in the headset: finale at session 54:00-66:00, programme by Toronto weekday (6 am boundary, ?mimeNight=mon..sun overrides); lounge after: mime visits couple, Jay, snug, TT, ST each 6 min round with 2-3 close-up tricks; glasses on Jay''s table grabbable (untested in VR).'
+  summary: 'nights.py holds Mon-Thu/Sat/Sun finales (Fri = cafe_figures base), tables.py the 16-trick table-visit lounge; all gates pass; deployed 2026-10-13 (lounge-594b960f...glb live).'
 pending_tasks:
 - task: 'Voice server rejects new room connections: mediasoup no more available ports (32 UDP attempts), also fails force_tcp. Occurred before and after the scene release; active transports
     observed, service not restarted. Diagnose before multiplayer acceptance.'
@@ -23,6 +23,8 @@ pending_tasks:
     viewpoint behavior.'
   priority: low
 session_history:
+- date: '2026-10-13'
+  summary: 'Bigger stage; couples moved to booth tables (CT, ST); Jay''s pick-up glasses replace waitress drinks; seven nightly mime finales by weekday; mime table visits with 16 rotating close-up tricks; Sat umbrella stow fix; deployed.'
 - date: '2026-10-12'
   summary: 'Rovers stage + mime finale (lights down, spotlight, knives, one-hand juggling, fire rola bola, fire eating, bouquet, bubbles); darts players turn to watch; café couple moves to the Rovers; RW waits on them; deployed.'
 - date: '2026-10-10'
@@ -31,5 +33,3 @@ session_history:
   summary: 'Mime never rests: tour of café/dining/snug/tub numbers (clubs, fire, magic, unicycle juggling); Rovers barmaid serves dinner party; staff drink in kitchen; deployed.'
 - date: '2026-10-08'
   summary: 'Hot tub regulars + Café du Parc (couple, mime 3 acts + Rovers red, chef/W1 espressos; lounge 1440 s); deployed; all three repos pushed (lounge branch).'
-- date: '2026-10-07'
-  summary: 'Planters: stripped the curtain sliver the house-plant copy dragged (9 plants); after-dinner Rovers move shipped; deployed.'

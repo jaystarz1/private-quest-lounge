@@ -140,32 +140,35 @@ MOUTH = V((0.05, 0.20, 1.50))
 CLAP = (V((-0.05, 0.33, 1.32)), V((0.05, 0.33, 1.32)))
 
 
-CAB_Z = RF.CAB_SEAT + 0.08 - 0.93                  # seated root z on the Rovers chairs
-WINE_SPOT = {"A": V((RF.CAB_TABLE[0] - 0.16, RF.CAB_TABLE[1] - 0.10, RF.CAB_TOP)),
-             "B": V((RF.CAB_TABLE[0] + 0.08, RF.CAB_TABLE[1] - 0.16, RF.CAB_TOP))}
+# In the Rovers they have the table beside the blonde lady's in the first booth
+# (Jay: not in the middle of the floor): she on the stool, facing the window,
+# he on the cushion opposite; their glasses on the table's west side, where the
+# Rovers barmaid reaches them from the gap between the tables. She drinks with
+# her left hand, he with his right.
+CAB_Z = {w: RF.CAB_SEAT[w] + 0.08 - 0.93 for w in "AB"}       # seated root z on the stool / the cushion
+CAB_FEET = {"A": RF.SEAT_FEET["stool"], "B": RF.SEAT_FEET["bench"]}
+WINE_SPOT = {"A": V((RF.CAB_TABLE[0] - 0.16, -11.24, RF.CAB_TOP)),
+             "B": V((RF.CAB_TABLE[0] - 0.16, -10.90, RF.CAB_TOP))}
+SIP_SIDE = {"A": "L", "B": "R"}
 CAFE_UP = {"A": (7.30, -9.00), "B": (8.60, -9.00)}  # where each stands up to, beside their café chair
 # Over to the Rovers once the dinner party has gone in: past the café, along the
-# balcony, in at the front door, to the table in front of the stage.
+# balcony, in at the front door, along the floor behind the booth stools: she
+# to the back of her stool, he up the gap between the two tables to the end of
+# the cushion (he sits there and slides along).
 TO_ROVERS = {"A": [(7.32, -8.40), (7.32, -7.62), (6.20, -7.75), (0.40, -7.75), (-0.65, -9.30), (-0.65, -11.10),
-                   (-1.20, -12.70), (-2.80, -12.72)],
+                   (0.30, -12.40), (1.60, -12.40)],
              "B": [(8.58, -8.40), (8.58, -7.62), (7.32, -7.62), (6.20, -7.75), (0.40, -7.75), (-0.65, -9.30),
-                   (-0.65, -11.10)]}
+                   (-0.65, -11.10), (0.30, -12.40), (1.52, -12.40), (1.52, -11.40)]}
 
 
 def cab_side(who):
-    """Beside their Rovers chair, where they step to sit down (A: its left,
-    B: its right)."""
-    x, y = RF.CAB_CHAIRS[who]
-    a = math.radians(RF.CAB_YAW[who])
-    right = V((math.cos(a), math.sin(a)))
-    s = -0.44 if who == "A" else 0.40
-    return (x + right.x * s, y + right.y * s)
+    """Where each stands to sit down (and stands up to)."""
+    return RF.CAB_STAND[who]
 
 
 def cab_root(who):
-    x, y = RF.CAB_CHAIRS[who]
-    fw = _fwd_xy(RF.CAB_YAW[who])
-    return V((x - 0.05 * fw.x, y - 0.05 * fw.y, CAB_Z))
+    x, y, _yaw = RF.CAB_SEATS[who]
+    return V((x, y, CAB_Z[who]))
 
 
 def bouquet_down():
@@ -202,8 +205,9 @@ class Patron:
         self.x, self.y = self.root.x, self.root.y
         f.put(0.0, self.x, self.y, self.yaw)
         f.zk.add(0.0, self.root.z)
-        f.fL.add(0.0, V(FEET[0]))
-        f.fR.add(0.0, V(FEET[1]))
+        feet = FEET if where == "cafe" else CAB_FEET[who]
+        f.fL.add(0.0, V(feet[0]))
+        f.fR.add(0.0, V(feet[1]))
         f.L.add(0.0, self.rest("L"))
         f.R.add(0.0, self.rest("R"))
         f.vis.add(0.0, 1.0)
@@ -269,21 +273,30 @@ class Patron:
         self.x, self.y = sx, sy
         self.where = "walk"
         t = self.walk(t1 + 0.2, [(sx, sy)] + TO_ROVERS[self.who] + [cab_side(self.who)])
-        t = self.turn(t, RF.CAB_YAW[self.who])
-        # Down into the chair (a step sideways onto it).
+        yaw = RF.CAB_YAW[self.who]
+        t = self.turn(t, yaw)
+        # Down onto the stool (her) or onto the end of the cushion and along it
+        # to his place (him), as the regulars do.
         root = cab_root(self.who)
-        f.put(t, self.x, self.y, RF.CAB_YAW[self.who])
+        feet = CAB_FEET[self.who]
+        f.put(t, self.x, self.y, yaw)
         f.zk.add(t, floor_z(self.x, self.y))
         f.fL.add(t, V(RF.STAND_FEET[0]))
         f.fR.add(t, V(RF.STAND_FEET[1]))
         f.L.hold(t)
         f.R.hold(t)
-        t1 = t + 1.7
-        f.put(t1, root.x, root.y, RF.CAB_YAW[self.who])
-        f.zk.add(t1, CAB_Z)
-        f.fL.add(t1, V(FEET[0]))
-        f.fR.add(t1, V(FEET[1]))
-        f.lean.add(t + 0.8, 14).add(t1 + 0.4, 6)
+        f.lean.add(t, 3).add(t + 0.6, 24)
+        t1 = t + 1.2
+        sx, sy = RF.CAB_SLIDE.get(self.who, (root.x, root.y))
+        f.put(t1, sx, sy, yaw)
+        f.zk.add(t1, root.z)
+        f.fL.add(t1, V(feet[0]))
+        f.fR.add(t1, V(feet[1]))
+        if self.who in RF.CAB_SLIDE:
+            t1 += 1.0
+            f.put(t1, root.x, root.y, yaw)
+            f.zk.add(t1, root.z)
+        f.lean.add(t1 + 0.4, 6)
         self.root, self.yaw = root, RF.CAB_YAW[self.who]
         self.x, self.y = root.x, root.y
         self.where = "rovers"
@@ -295,25 +308,30 @@ class Patron:
         return t1 + 0.4
 
     def sip(self, t, cup, spot=None, grip=CUP_GRIP, tilt=38, mouth=None):
-        """Cup (or glass) up off the table, a sip, down again."""
+        """Cup (or glass) up off the table, a sip, down again (at the café with
+        the right hand; in the Rovers with the hand on the glass's side)."""
         f = self.f
         where = self.seated_at(t) or "rovers"
+        side = "R" if where == "cafe" else SIP_SIDE[self.who]
+        keys = f.R if side == "R" else f.L
+        sx = 1.0 if side == "R" else -1.0
         spot = spot if spot is not None else CUP[self.who]
-        g = self.loc(spot, where) + V((-0.02, -0.06, grip - 0.01))
-        f.R.hold(t)
+        g = self.loc(spot, where) + V((-0.02 * sx, -0.06, grip - 0.01))
+        keys.hold(t)
         tc = t + 0.9
-        ct = DF.CT(g, f.tag, "R", tc, DF.palm_for("glass", spot, grip))
+        ct = DF.CT(g, f.tag, side, tc, DF.palm_for("glass", spot, grip))
         DF.CONTACTS.append(ct)
-        f.R.add(tc, ct)
-        cup.at(tc, ("hand", f.tag, "R", "glass"))
+        keys.add(tc, ct)
+        cup.at(tc, ("hand", f.tag, side, "glass"))
         mo = (mouth or MOUTH).copy()
-        f.R.add(tc + 0.9, mo).add(tc + 2.1, mo.copy())
+        mo.x *= sx
+        keys.add(tc + 0.9, mo).add(tc + 2.1, mo.copy())
         cup.tilt.add(tc + 0.7, 0).add(tc + 1.2, tilt).add(tc + 1.8, tilt).add(tc + 2.3, 0)
-        ct2 = DF.CT(g, f.tag, "R", tc + 3.0, DF.palm_for("glass", spot, grip))
+        ct2 = DF.CT(g, f.tag, side, tc + 3.0, DF.palm_for("glass", spot, grip))
         DF.CONTACTS.append(ct2)
-        f.R.add(tc + 3.0, ct2)
+        keys.add(tc + 3.0, ct2)
         cup.at(tc + 3.0, ("spot", spot.copy(), 0.0 if where == "cafe" else RF.CAB_YAW[self.who]))
-        f.R.add(tc + 3.7, (REST if where == "cafe" else LAPH)["R"].copy())
+        keys.add(tc + 3.7, (REST if where == "cafe" else LAPH)[side].copy())
         self.busy.append((t, tc + 3.8))
         return tc + 3.8
 
@@ -379,6 +397,7 @@ JUG = {"ball": ({"L": V((-0.07, 0.32, 1.04)), "R": V((0.07, 0.32, 1.04))},
        "club": ({"L": V((-0.09, 0.30, 0.99)), "R": V((0.09, 0.30, 0.99))},
                 {"L": V((-0.24, 0.27, 1.06)), "R": V((0.24, 0.27, 1.06))})}
 JUG["torch"] = JUG["club"]
+BALLISH = ("ball", "glow")                         # kinds thrown and held like balls
 POCKET = {"L": V((-0.20, 0.10, 0.95)), "R": V((0.20, 0.10, 0.95))}
 NAMES = {"ball": ("Ball0", "Ball1", "Ball2"), "club": ("Club0", "Club1", "Club2"),
          "torch": ("Torch0", "Torch1", "Torch2")}
@@ -409,7 +428,7 @@ def held(kind, side, slot):
     """(offset from the palm in his body frame, orientation in his body frame)."""
     if kind == "card":
         return np.array((0.0, 0.0, 0.03)), Q_ID
-    if kind == "ball":
+    if kind in ("ball", "glow"):
         return np.array((0.0, 0.0, BALL_R + 0.004 + 0.065 * slot)), Q_ID
     s = 1.0 if side == "R" else -1.0
     off = np.zeros(3) if slot == 0 else np.array((s * 0.025, -0.03, -0.035))
@@ -419,6 +438,40 @@ def held(kind, side, slot):
 def hand_state(kind, side, slot):
     off, q = held(kind, side, slot)
     return ("hand", side, off, q)
+
+
+STAGE_CLEAR = 0.18                                 # his root never nearer the trunk or the drapes than this
+
+
+def stage_clear(xy):
+    """A spot on the stage moved clear of the trunk (west or south of it,
+    whichever is nearer: it stands in the back corner by the lobby wall) and of
+    the drapes at the back and sides."""
+    x, y = xy
+    xs = [p[0] for p in RF.STAGE_POLY]
+    x = min(max(x, min(xs) + STAGE_CLEAR), max(xs) - STAGE_CLEAR)
+    y = min(y, max(p[1] for p in RF.STAGE_POLY) - STAGE_CLEAR)
+    tx, ty = RF.TRUNK
+    hx, hy = RF.TRUNK_SIZE[0] / 2 + STAGE_CLEAR, RF.TRUNK_SIZE[1] / 2 + STAGE_CLEAR
+    if abs(x - tx) < hx and abs(y - ty) < hy:
+        if x - (tx - hx) < y - (ty - hy):
+            x = tx - hx
+        else:
+            y = ty - hy
+    return (x, y)
+
+
+def trunk_corner(a, b):
+    """The corner of the trunk's keep-out (stage_clear) to go round on the way
+    from a to b on the stage, or None when the straight way is clear."""
+    tx, ty = RF.TRUNK
+    hx, hy = RF.TRUNK_SIZE[0] / 2 + STAGE_CLEAR, RF.TRUNK_SIZE[1] / 2 + STAGE_CLEAR
+    for k in range(1, 20):
+        u = k / 20
+        x, y = a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u
+        if abs(x - tx) < hx - 0.01 and abs(y - ty) < hy - 0.01:
+            return (tx - hx, ty - hy)
+    return None
 
 
 class Mime(DF.Staff):
@@ -445,8 +498,12 @@ class Mime(DF.Staff):
             st = self.stored(name) if name in STORED else rola_rest(name) if name.startswith("Rola") else \
                 stage_rest(name) if name in STAGE_REST else ("hide",)
             self.prop(name, 0.0, st, 0)
-        self.dim = Keys().add(0.0, 0.001)            # house lights: 0.001 up .. 1 down (the Show bone's scale)
+        self.dim = Keys().add(0.0, 0.001)            # house lights: 0.001 up .. 1 down (the Show bone's scale x)
         self.beam = Keys().add(0.0, 0.0)             # the spotlight's beam: 0 off .. 1 on
+        self.spot = Keys().add(0.0, 1.0)             # the spotlight's light on him: 0 .. 1 (scale y, times dim)
+        self.black = Keys().add(0.0, 0.0)            # blackout: the rest of the room right down, 0 .. 1 (scale z)
+        self.spot_free = Keys().add(0.0, 0.0)        # 0: the spot on him .. 1: on spot_at (world xy) instead
+        self.spot_at = Keys().add(0.0, V((RF.MIME_PUB[0], RF.MIME_PUB[1], 0.0)))
         self.uni_at = {}                          # venue -> (where he stood, his yaw, the pose it lies in)
 
     def stored(self, name):
@@ -496,8 +553,17 @@ class Mime(DF.Staff):
         self.f.yaw.add(t + dur, max(-70.0, min(70.0, rel)))
 
     def slide(self, t, xy, dur, yaw=None):
-        """Root glides to xy over dur (no turn into it)."""
+        """Root glides to xy over dur (no turn into it). On the stage: kept
+        clear of the trunk and the drapes (stage_clear)."""
         f = self.f
+        if RF.on_stage(self.x, self.y) and RF.on_stage(*xy):
+            xy = stage_clear(xy)
+            c = trunk_corner((self.x, self.y), xy)
+            if c is not None:                        # (round the trunk's corner, not through it)
+                a_ = (V(c) - V((self.x, self.y))).length
+                b_ = (V(xy) - V(c)).length
+                t = self.slide(t, c, dur * a_ / max(1e-6, a_ + b_))
+                dur = dur * b_ / max(1e-6, a_ + b_)
         f.put(t, self.x, self.y, self.yaw)
         y = self.yaw if yaw is None else yaw
         f.put(t + dur, xy[0], xy[1], y)
@@ -577,7 +643,7 @@ def cascade(m, kind, t0, n, b, d=None, style="plain", spins=1):
     from the hand holding two. Returns the end time (last catch made)."""
     f = m.f
     IN, OUT = JUG[kind]
-    d = d if d is not None else (0.14 if kind == "ball" else 0.19)
+    d = d if d is not None else (0.14 if kind in BALLISH else 0.19)
     H = m.holding[kind]
     S = "R" if sum(1 for v in H.values() if v[0] == "R") == 2 else "L"
     O = OTHER[S]
@@ -590,7 +656,7 @@ def cascade(m, kind, t0, n, b, d=None, style="plain", spins=1):
         side = S if k % 2 == 0 else O
         tt = t0 + k * b
         tc = tt + 3 * b - d
-        m.prop(NAMES[kind][o], tt, ("fly", side, tt, OTHER[side], tc, kind, spins if kind != "ball" else 0), 0)
+        m.prop(NAMES[kind][o], tt, ("fly", side, tt, OTHER[side], tc, kind, spins if kind not in BALLISH else 0), 0)
         m.prop(NAMES[kind][o], tc, hand_state(kind, OTHER[side], 0), 0)
     lift = V((0, 0, 0.04)) if style == "high" else V()
     for side, first in ((S, 0), (O, 1)):
@@ -634,7 +700,7 @@ def flash(m, kind, t0, T=1.15, b=0.22, spins=2, pirouette=True):
     for k, (o, side) in enumerate(order):
         tt = t0 + k * b
         tc = tt + T
-        m.prop(NAMES[kind][o], tt, ("fly", side, tt, OTHER[side], tc, kind, spins if kind != "ball" else 0), 0)
+        m.prop(NAMES[kind][o], tt, ("fly", side, tt, OTHER[side], tc, kind, spins if kind not in BALLISH else 0), 0)
         to = OTHER[side]
         slot = 1 if any(s == to for s, _sl in new.values()) else 0
         new[o] = (to, slot)
@@ -664,7 +730,7 @@ def flash(m, kind, t0, T=1.15, b=0.22, spins=2, pirouette=True):
     t1 = t0 + 2 * b + T + 0.3
     for side in "LR":
         keys = f.L if side == "L" else f.R
-        keys.add(t1, CARRY[side].copy() if kind != "ball" else OUT[side].copy())
+        keys.add(t1, CARRY[side].copy() if kind not in BALLISH else OUT[side].copy())
     return t1
 
 
@@ -2073,14 +2139,21 @@ FIN_FACE = RF.MIME_PUB_FACE                         # to the room
 FIN_WAIT = (-3.12, -10.52)                          # upstage by his table, where he waits in the dark
 LIGHTS_DOWN = (20.0, 26.0)                          # finale seconds: house lights going down
 BEAM_ON = 26.0
-LIGHTS_UP = (570.0, 578.0)
-BEAM_OFF = (573.0, 575.5)
+LIGHTS_UP = (576.0, 584.0)
+BEAM_OFF = (579.0, 581.5)
 ROLA2_W_OUT = 0.10                                  # the stage rola bola is set this far in front of his spot
 ROLA2_BACK = 0.30                                   # and he steps up onto it from this far behind it
 Q_WAND = DF.qx(-35.0)                               # a wand in the hand: the stick up and forward
 Q_EAT = DF.qx(165.0)                                # a torch held over his face, its flame down into his mouth
 MOUTH_UP = V((0.0, 0.14, 1.64))                     # his mouth, head tilted back (his frame)
-BOUQUET_SPOT = V((RF.CAB_TABLE[0] - 0.14, RF.CAB_TABLE[1] - 0.12, RF.CAB_TOP))
+BOUQUET_SPOT = V((RF.CAB_TABLE[0] + 0.02, RF.CAB_TABLE[1] - 0.14, RF.CAB_TOP))
+# The bouquet is given to the café lady from beside her stool (her left: the
+# gap behind the stools between her table and the blonde lady's), along the
+# floor from the step and back; every night the same way at the same times
+# (her part is in the one dinner clip).
+GIFT_AT = (1.50, -12.00)
+GIFT_HAND = V((1.84, -11.76, 0.98))                 # where his hand meets hers
+GIFT_WAY = [(-1.90, -10.85), (-1.55, -11.10), (-1.10, -11.30), (0.20, -12.30), (1.50, -12.30), GIFT_AT]
 
 
 def _fwd_xy(yaw):
@@ -2159,9 +2232,9 @@ def one_hand(m, kind, side, t0, n, b, d=None, other=None):
     (other: its pose). Returns when the last is caught and carried."""
     f = m.f
     IN, OUT = JUG[kind]
-    if kind == "ball":                          # (one hand's loop is tighter than a cascade's)
+    if kind in BALLISH:                          # (one hand's loop is tighter than a cascade's)
         OUT = {k: IN[k] + 0.6 * (OUT[k] - IN[k]) for k in OUT}
-    d = d if d is not None else (0.15 if kind == "ball" else 0.20)
+    d = d if d is not None else (0.15 if kind in BALLISH else 0.20)
     H = m.holding[kind]
     mine = sorted([i for i, v in H.items() if v[0] == side], key=lambda i: H[i][1])
     k = len(mine)
@@ -2173,7 +2246,7 @@ def one_hand(m, kind, side, t0, n, b, d=None, other=None):
     for i, o in enumerate(order):
         tt = t0 + i * b
         tc = tt + k * b - d
-        m.prop(NAMES[kind][o], tt, ("fly", side, tt, side, tc, kind, 1 if kind != "ball" else 0), 0)
+        m.prop(NAMES[kind][o], tt, ("fly", side, tt, side, tc, kind, 1 if kind not in BALLISH else 0), 0)
         m.prop(NAMES[kind][o], tc, hand_state(kind, side, 0), 0)
         last_catch[o] = tc
     for i in range(n + k):
@@ -2192,9 +2265,9 @@ def one_hand(m, kind, side, t0, n, b, d=None, other=None):
     if other is not None:
         okeys = f.R if side == "L" else f.L
         okeys.hold(t0 - 0.6).add(t0 + 0.5, other.copy()).add(end, other.copy())   # (up slowly: it may have just caught)
-    keys.add(end + 0.6, (CARRY if kind != "ball" else OUT)[side].copy())
+    keys.add(end + 0.6, (CARRY if kind not in BALLISH else OUT)[side].copy())
     if other is not None:                       # (down from showing off: not a snatch)
-        okeys.add(end + 1.0, (CARRY if kind != "ball" else OUT)[OTHER[side]].copy())
+        okeys.add(end + 1.0, (CARRY if kind not in BALLISH else OUT)[OTHER[side]].copy())
     return end + 1.4
 
 
@@ -2210,7 +2283,7 @@ def pass_over(m, kind, obj, frm, t, T=0.55):
     DF.hold_live(tk, t - 0.35)
     fk.add(t, IN[frm].copy())
     tk.add(t + T - 0.02, OUT[to].copy())
-    m.prop(NAMES[kind][obj], t, ("fly", frm, t, to, t + T, kind, 1 if kind != "ball" else 0), 0)
+    m.prop(NAMES[kind][obj], t, ("fly", frm, t, to, t + T, kind, 1 if kind not in BALLISH else 0), 0)
     m.prop(NAMES[kind][obj], t + T, hand_state(kind, to, slot), 0)
     H[obj] = (to, slot)
     for side in (frm, to):
@@ -2220,8 +2293,8 @@ def pass_over(m, kind, obj, frm, t, T=0.55):
                 H[i] = (side, j)
                 m.prop(NAMES[kind][i], t + T + 0.05, hand_state(kind, side, j), 4)
         m.hold[side] = kind if mine else None
-    fk.add(t + T + 0.4, (CARRY if kind != "ball" else OUT)[frm].copy())
-    tk.add(t + T + 0.4, (CARRY if kind != "ball" else OUT)[to].copy())
+    fk.add(t + T + 0.4, (CARRY if kind not in BALLISH else OUT)[frm].copy())
+    tk.add(t + T + 0.4, (CARRY if kind not in BALLISH else OUT)[to].copy())
     return t + T + 0.4
 
 
@@ -2276,6 +2349,10 @@ def fin_box(m, t, t_bow):
     return t
 
 
+_kd = V(FIN_SPOT) - V(RF.STAGE_TABLE)
+KNIFE_AT = tuple(V(RF.STAGE_TABLE) + _kd.normalized() * 0.55)   # in front of his prop table, the block in reach
+
+
 def fin_knives(m, t, t_bow):
     """Act 1: three knives out of the block on his table; juggled slow and
     high, fast, a flash with a pirouette; then one-handed, two in a hand while
@@ -2284,10 +2361,9 @@ def fin_knives(m, t, t_bow):
     f = m.f
     t0 = t
     hb = VENUES["pub"]["hb"]
-    back = FIN_FACE + 180.0
-    t = m.turn(t, back)
-    fw = _fwd_xy(back)
-    t = _step_to(m, t, (FIN_SPOT[0] + 0.14 * fw.x, FIN_SPOT[1] + 0.14 * fw.y))
+    to_block = heading(KNIFE_AT, RF.STAGE_TABLE)
+    t = m.turn(t, heading((m.x, m.y), KNIFE_AT))
+    t = _step_to(m, t, KNIFE_AT, to_block)
     grip = lambda name: STAGE_REST[name][0] + V((0, 0, 0.04))
     # The middle one out with the right hand and over to the left, then the other two.
     t = _take_prop(m, t, "R", "Knife1", hand_state("knife", "R", 0), grip("Knife1"), lean=30, pitch=28)
@@ -2303,8 +2379,8 @@ def fin_knives(m, t, t_bow):
     f.R.add(t + 0.5, CARRY["R"].copy())
     f.lean.add(t + 0.5, 3)
     f.pitch.add(t + 0.5, 3)
-    t = _step_to(m, t + 0.5, FIN_SPOT)
-    t = m.turn(t, FIN_FACE)
+    t = m.turn(t + 0.5, heading(KNIFE_AT, FIN_SPOT))
+    t = _step_to(m, t, FIN_SPOT, FIN_FACE)
     # The left one up into the light, turned so the blade flashes.
     f.L.add(t + 0.8, V((-0.22, 0.34, 1.72))).add(t + 2.6, V((-0.18, 0.36, 1.76)))
     f.pitch.add(t + 0.8, -18).add(t + 2.6, -18).add(t + 3.2, 10)
@@ -2322,8 +2398,8 @@ def fin_knives(m, t, t_bow):
     t = cascade(m, "knife", t + 0.4, 10, 0.42 * hb, 0.22, style="high") + 0.5
     f.pitch.add(t, 3)
     # Back in the block.
-    t = m.turn(t, back)
-    t = _step_to(m, t, (FIN_SPOT[0] + 0.14 * fw.x, FIN_SPOT[1] + 0.14 * fw.y))
+    t = m.turn(t, heading((m.x, m.y), KNIFE_AT))
+    t = _step_to(m, t, KNIFE_AT, to_block)
     H = m.holding["knife"]
     for side in ("R", "L"):
         for i in sorted([i for i, v in H.items() if v[0] == side], key=lambda i: -H[i][1]):
@@ -2332,8 +2408,8 @@ def fin_knives(m, t, t_bow):
             del H[i]
             t = _back(m, t, 0.5)
     m.holding["knife"] = {}
-    t = _step_to(m, t, FIN_SPOT)
-    t = m.turn(t, FIN_FACE)
+    t = m.turn(t, heading(KNIFE_AT, FIN_SPOT))
+    t = _step_to(m, t, FIN_SPOT, FIN_FACE)
     t = _land(m, t, t_bow, "knives")
     t = m.bow(t, 40, "pub")
     m.acts.append((t0, t, "knives", "pub"))
@@ -2576,12 +2652,10 @@ def fin_fire_eat(m, t, t_bow):
     return t
 
 
-def fin_bouquet(m, t, t_bow):
-    """Act 5: silks out of his fist, a bouquet from nowhere; down off the stage
-    to the café lady's table: she takes it, smells it and sets it down; back up
-    for his bow."""
+def prod_silks(m, t):
+    """The gift, its making (one night's way): silks out of his fist, then a
+    bouquet out of the air. Ends with the bouquet in his right hand."""
     f = m.f
-    t0 = t
     fist = V((-0.05, 0.32, 1.24))
     f.L.add(t + 0.7, fist.copy())
     f.R.add(t + 0.7, fist + V((0.06, 0.0, 0.03)))
@@ -2606,25 +2680,46 @@ def fin_bouquet(m, t, t_bow):
     f.L.add(t + 4.2, V((-0.30, 0.34, 1.36)))
     f.R.add(t + 4.2, V((0.30, 0.34, 1.36)))
     t += 4.6
-    # The bouquet out of the air, to the lady.
+    # The bouquet out of the air.
     f.R.add(t + 0.8, V((0.36, 0.20, 1.70))).add(t + 1.4, V((0.22, 0.42, 1.38)))
     f.L.add(t + 0.8, HR["L"].copy())
     m.prop("Bouquet", t + 1.4, ("hand", "R", np.array((0.0, 0.0, 0.02)), Q_ID), 0)
     m.scale("Bouquet", t + 1.4, 0.001, t + 1.8, 1.0)
     m.hold["R"] = "bouquet"
-    lady = RF.CAB_CHAIRS["A"]
-    m.look_at(t + 2.0, lady)
-    t += 2.6
-    to = (-3.00, -11.72)                                             # beside her table, west of it
-    t = m.walk(t, [(m.x, m.y), (-2.62, -11.04), (-2.86, -11.40), to])
-    t = m.face(t, (lady[0], lady[1] + 0.20))
+    return t + 2.0
+
+
+GIFT_LEAVE = 381.0                                   # finale seconds: he sets off to the café lady, every night
+GIFT_HOLD = V((0.22, 0.42, 1.38))                    # (the bouquet held out while he waits for it)
+
+
+def gift_walk(m, t, t_bow):
+    """Every night the same: the bouquet in his right hand on his spot, down
+    off the stage to the café lady at GIFT_LEAVE (her part is in the one
+    dinner clip): she takes it, smells it and sets it down; back up for his bow."""
+    f = m.f
+    t0 = t
+    t_go = m.F0 + GIFT_LEAVE
+    if t > t_go - 1.2:
+        m.late.append(("gift", round(t - (t_go - 1.2), 1)))
+    t = _step_to(m, t, FIN_SPOT)
+    t = m.turn(t, FIN_FACE)
+    m.stay(t)
+    f.R.hold(t).add(t_go - 1.4, GIFT_HOLD.copy())
+    f.L.hold(t).add(t_go - 1.4, HR["L"].copy())
+    lady = RF.CAB_SEATS["A"][:2]
+    m.look_at(t_go - 1.4, lady)
+    t = t_go
+    m.stay(t)
+    t = m.leg(t, [(m.x, m.y)] + GIFT_WAY, "gift_to")
+    t = m.face(t, (lady[0], lady[1] + 0.05))
     # Offered low, with a bow; she takes it.
     f.lean.hold(t).add(t + 1.2, 26)
     f.pitch.hold(t).add(t + 1.2, 18)
-    f.R.hold(t).add(t + 1.2, f.at_world(V((lady[0] - 0.08, lady[1] + 0.30, 0.98))))
+    f.R.hold(t).add(t + 1.2, f.at_world(GIFT_HAND))
     t_offer = t + 1.2
     t_take = t_offer + 1.6
-    m.prop("Bouquet", t_take, ("hand2", TAGS["A"], "R", np.array((0.0, 0.0, 0.02)), Q_ID), 6)
+    m.prop("Bouquet", t_take, ("hand2", TAGS["A"], "L", np.array((0.0, 0.0, 0.02)), Q_ID), 6)
     m.hold["R"] = None
     m.gift = (t_offer, t_take)
     f.R.add(t_take + 0.6, V((0.10, 0.30, 1.30)))                       # hand on his heart
@@ -2633,12 +2728,17 @@ def fin_bouquet(m, t, t_bow):
     f.R.add(t_take + 3.0, HR["R"].copy())
     t = t_take + 3.2
     m.bouquet_down = t_take + 6.0                                     # (she sets it on the table)
-    t = m.walk(t, [(m.x, m.y), (-2.86, -11.40), (-2.62, -11.04), FIN_SPOT])
+    t = m.leg(t, [(m.x, m.y)] + list(reversed(GIFT_WAY[:-1])) + [FIN_SPOT], "gift_back")
     t = m.turn(t, FIN_FACE)
     t = _land(m, t, t_bow, "bouquet")
     t = m.bow(t, 45, "pub")
     m.acts.append((t0, t, "bouquet", "pub"))
     return t
+
+
+def bouquet_props(m):
+    """Her side of it in his prop rig: the bouquet down on their table."""
+    m.prop("Bouquet", m.bouquet_down, bouquet_down(), 6)
 
 
 def _wand_tip(C, side, fis, q_hold=Q_WAND):
@@ -2843,30 +2943,55 @@ def fin_bubbles(m, t, t_bow):
     return t
 
 
-def fin_ovation(m, t, F0):
-    """The ovation: bows to each side of the room, the wands back in the
-    bucket, the lights up, a last hat-tip bow."""
-    f = m.f
-    for k in (0, 1):
-        t = _side(m, t, "pub", k)
-        t = m.bow(t, 35, "pub", hat=False)
-    t = _side(m, t, "pub", None)
+def tidy_wands(m, t):
+    """(The bubbles night) the string wands back in the bucket."""
     at_bucket = (-3.22, -10.72)
     t = _step_to(m, t, at_bucket, heading(at_bucket, RF.BUCKET))
     grip = lambda name: STAGE_REST[name][0] + V((0, 0, 0.02))
     t = _put_prop(m, t, "L", "WandL", grip("WandL"), dur=1.3, lean=36, pitch=30)
     t = _put_prop(m, t, "R", "WandR", grip("WandR"), dur=1.3, lean=36, pitch=30)
-    t = _back(m, t, 1.0)
+    return _back(m, t, 1.0)
+
+
+def fin_ovation(m, t, F0, tidy=None):
+    """The ovation: bows to each side of the room, the night's kit put away,
+    the lights up, a last hat-tip bow (every night ending at the same moment)."""
+    f = m.f
+    for k in (0, 1):
+        t = _side(m, t, "pub", k)
+        t = m.bow(t, 35, "pub", hat=False)
+    t = _side(m, t, "pub", None)
+    if tidy is not None:
+        t = tidy(m, t)
     t = _step_to(m, t, FIN_SPOT, FIN_FACE)
-    t = max(t, F0 + LIGHTS_UP[1] - 1.0)
+    t_up = F0 + LIGHTS_UP[1] - 1.0
+    if t > t_up:
+        m.late.append(("ovation", round(t - t_up, 1)))
+    t = max(t, t_up)
     m.stay(t)
     t = m.bow(t, 60, "pub")                                          # the hat, in the house lights
     return t
 
 
-def finale(m, cr, F0, t, rng):
+# The night's programme (Jay: a different big show every night of the week):
+# seven numbers, each landing its bow on the regulars' marks (FINALE_BOWS), the
+# sixth the gift (its making, then gift_walk), and what the ovation puts away.
+NIGHTS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+BASE_NIGHT = "fri"                                    # the one the dinner is planned and solved with
+PROGRAMS = {}
+
+
+def _programme(night):
+    if night in PROGRAMS:
+        return PROGRAMS[night]
+    return ((fin_box, fin_knives, fin_one_hand, fin_rola_fire, fin_fire_eat, prod_silks, fin_bubbles), tidy_wands)
+
+
+def finale(m, cr, F0, t, rng, night=BASE_NIGHT):
     """The whole finale, from F0 (he is waiting upstage in the dark from t)."""
     f = m.f
+    m.F0 = F0
+    m.night = night
     B = [F0 + b for b in RF.FINALE_BOWS]
     t_spot = F0 + BEAM_ON
     # Lights.
@@ -2883,18 +3008,20 @@ def finale(m, cr, F0, t, rng):
     f.lean.add(t + 0.8, 6)
     f.pitch.add(t + 0.8, -10)
     m.stay(t_spot + 0.6)
+    for k in (f.fL, f.fR, f.zk, f.twist, f.yaw, f.lean):    # (every night the same up to here)
+        k.hold(t_spot + 0.6)
     f.L.add(t_spot + 0.6, V((-0.34, 0.18, 1.42)))
     f.R.add(t_spot + 0.6, V((0.12, 0.30, 1.72)))
     f.pitch.add(t_spot + 0.6, -10)
     m.audience.append((F0, F0 + RF.FINALE_WATCH[1], "pub", None))
-    t = fin_box(m, t_spot + 0.6, B[0])
-    t = fin_knives(m, t + 0.4, B[1])
-    t = fin_one_hand(m, t + 0.4, B[2])
-    t = fin_rola_fire(m, t + 0.4, B[3])
-    t = fin_fire_eat(m, t + 0.4, B[4])
-    t = fin_bouquet(m, t + 0.4, B[5])
-    t = fin_bubbles(m, t + 0.4, B[6])
-    t = fin_ovation(m, t, F0)
+    acts, tidy = _programme(night)
+    t = acts[0](m, t_spot + 0.6, B[0])
+    for k in (1, 2, 3, 4):
+        t = acts[k](m, t + 0.4, B[k])
+    t = acts[5](m, t + 0.4)
+    t = gift_walk(m, t, B[5])
+    t = acts[6](m, t + 0.4, B[6])
+    t = fin_ovation(m, t, F0, tidy)
     return t
 
 
@@ -3014,7 +3141,7 @@ def add_actors(cr, dues, lounge=False):
     cr.cafe_due = list(dues)
 
 
-def author_dinner(cr, La, D, rng):
+def author_dinner(cr, La, D, rng, night=None):
     """The mime over the dinner clip: a round every PHASE from the start (see
     DIN_ACTS), on the regulars' beat; the last round ends on the Rovers'
     stage, the finale from rovers_figures.FINALE_AT, then he mingles."""
@@ -3027,7 +3154,7 @@ def author_dinner(cr, La, D, rng):
         t = cycle(m, c0, max(t, c0 + 0.5), DIN_ACTS[k % len(DIN_ACTS)], f"d{k}", cr, rng, last=k == rounds - 1)
     if t > F0 + 4.0:
         m.late.append(("into the finale", round(t - F0, 1)))
-    t = finale(m, cr, F0, t, rng)
+    t = finale(m, cr, F0, t, rng, night or BASE_NIGHT)
     t = after_show(m, t, D)
     m.overrun = max(m.overrun, t - (D - 1.6))
     return m
@@ -3039,10 +3166,12 @@ def author_dinner(cr, La, D, rng):
 # magic, across to the dinner party in the snug with his cards and his balls,
 # and back to the front of the stage, where he leans on an invisible lamp post,
 # downs an invisible pint, hauls on an invisible rope, waves people over.
-MINGLE_HOME = (-2.75, -10.58)                        # at the front of the stage, facing the room
-COUPLE_SPOT = (-2.36, -11.38)                        # between the step and the couple's table, facing them
+MINGLE_HOME = (-2.30, -11.05)                        # at the front of the stage, facing the room
+COUPLE_SPOT = GIFT_AT                                # beside the café lady's stool, facing their table
+DOWN_STEP = GIFT_WAY[:4]                             # from the stage down the step to the floor
+TO_COUPLE = GIFT_WAY[3:]
 SNUG_SPOT = DF.GAP_STAND                              # between the snug's two tables
-TO_SNUG = [(-1.30, -11.32), (-0.65, -11.62), (0.40, -12.40), (3.90, -12.40), DF.SNUG_IN, (4.75, DF.GAP_Y)]
+TO_SNUG = [(1.50, -12.40), (3.90, -12.40), DF.SNUG_IN, (4.75, DF.GAP_Y)]
 
 
 def _home_bit(m, t, kind):
@@ -3148,11 +3277,11 @@ def mingle_couple(m, t, cr):
     found in his own mouth; three balls juggled low for them; a bow to each."""
     f = m.f
     t0 = t
-    lady, man = RF.CAB_CHAIRS["A"], RF.CAB_CHAIRS["B"]
+    lady, man = RF.CAB_SEATS["A"][:2], RF.CAB_SEATS["B"][:2]
     t = m.face(t, RF.CAB_TABLE)
     t = mime_chat(m, t, 22.0, [lady, man], random.Random(f"chat-couple{int(t)}"))
     m.look_at(t, lady)
-    ear = V((lady[0] + 0.10, lady[1] + 0.05, RF.CAB_SEAT + 0.72))
+    ear = V((lady[0] - 0.08, lady[1] - 0.02, RF.CAB_SEAT["A"] + 0.72))
     f.R.hold(t).add(t + 1.2, f.at_world(ear))
     f.lean.hold(t).add(t + 1.2, 22)
     m.prop("MBall", t + 1.3, ("hand", "R", np.array((0, 0, BALL_R)), Q_ID), 0)
@@ -3241,12 +3370,12 @@ def mingle_round(m, c0, t, n, cr, rng, t_end=None):
     rest of the time spent there. Ends by c0 + CYCLE (or t_end)."""
     t_end = c0 + CYCLE - 1.6 if t_end is None else t_end
     t = home_bits(m, t, max(t, c0 + 16.0), rng)
-    t = m.leg(t, [(m.x, m.y), (-2.62, -11.04), (-2.58, -11.22), COUPLE_SPOT], f"m{n}_couple")
+    t = m.leg(t, [(m.x, m.y)] + DOWN_STEP + TO_COUPLE[1:], f"m{n}_couple")
     t = mingle_couple(m, t, cr)
     t = m.leg(t, [(m.x, m.y)] + TO_SNUG + [SNUG_SPOT], f"m{n}_snug", juggle=True)
     t = mingle_snug(m, t)
-    t = m.leg(t, [(m.x, m.y)] + list(reversed(TO_SNUG)) + [COUPLE_SPOT, (-2.58, -11.22), (-2.62, -11.04),
-                                                           MINGLE_HOME], f"m{n}_home", juggle=True)
+    t = m.leg(t, [(m.x, m.y)] + list(reversed(TO_SNUG)) + list(reversed(TO_COUPLE[:-1])) +
+              list(reversed(DOWN_STEP[:-1])) + [MINGLE_HOME], f"m{n}_home", juggle=True)
     t = m.turn(t, FIN_FACE)
     t = home_bits(m, t, t_end, rng)
     m.overrun = max(m.overrun, t - t_end)
@@ -3258,14 +3387,15 @@ def after_show(m, t, D):
     out among the crowd until the dinner clip ends (at the front of the stage,
     as the lounge loop begins)."""
     rng = random.Random("after-show")
-    t = m.leg(t, [(m.x, m.y), (-2.62, -11.04), (-2.58, -11.22), COUPLE_SPOT], "a_couple")
+    t = m.leg(t, [(m.x, m.y)] + DOWN_STEP + TO_COUPLE[1:], "a_couple")
     t = m.face(t, RF.CAB_TABLE)
-    lady, man = RF.CAB_CHAIRS["A"], RF.CAB_CHAIRS["B"]
+    lady, man = RF.CAB_SEATS["A"][:2], RF.CAB_SEATS["B"][:2]
     for who in (lady, man):
         m.look_at(t, who)
         t = m.bow(t + 0.3, 32, "couple")
     m.f.yaw.add(t, 0)
-    t = m.leg(t, [(m.x, m.y), (-2.58, -11.22), (-2.62, -11.04), MINGLE_HOME], "a_home")
+    t = m.leg(t, [(m.x, m.y)] + list(reversed(TO_COUPLE[:-1])) + list(reversed(DOWN_STEP[:-1])) + [MINGLE_HOME],
+              "a_home")
     t = m.turn(t, FIN_FACE)
     return home_bits(m, t, D - 1.6, rng)
 
@@ -3276,12 +3406,12 @@ LOUNGE_DUE = []                                   # (the lounge's rounds are KIT
 
 
 def author_lounge(cr, rng):
-    """The lounge loop: after the finale he mingles, a round of the room each
-    PHASE (see mingle_round)."""
+    """The lounge loop: after the finale he mingles, a round of the tables each
+    PHASE (tables.mingle_round)."""
     m = cr.mime
     t = 0.5
     for n in range(int(round(DF.LOOP / CYCLE))):
-        t = mingle_round(m, n * CYCLE, max(t, n * CYCLE + 0.5), n, cr, rng)
+        t = tables.mingle_round(m, n * CYCLE, max(t, n * CYCLE + 0.5), n, cr, rng)
     if m.overrun > 0.0:
         raise RuntimeError(f"mime: a lounge round overruns by {m.overrun:.1f}s")
     return t
@@ -3318,7 +3448,7 @@ def author_couple(cr, t_end, calm=None):
         f = g.f
         for tb, venue in m.bows:                  # applause after each of his bows they see
             where = g.seated_at(tb)
-            if not ((where == "cafe" and venue == "cafe") or (where == "rovers" and venue in ("pub", "couple"))):
+            if not ((where == "cafe" and venue == "cafe") or (where == "rovers" and venue in ("pub", "couple", "jay"))):
                 continue
             if tb < t_end - 6 and not (calm and calm[0] - 5 < tb < calm[1] + 5) and g.free(tb, tb + 3.5):
                 g.clap(tb + 0.4 + rng.uniform(0, 0.4), 16 if abs(tb - big) < 3.0 else rng.randint(6, 10))
@@ -3349,25 +3479,26 @@ def _bouquet_lady(cr):
     t_offer, t_take = m.gift
     f = A.f
     mt = TAGS["M"]
-    est = V((RF.CAB_CHAIRS["A"][0] - 0.08, RF.CAB_CHAIRS["A"][1] + 0.30, 0.98 + 0.08))
+    est = GIFT_HAND + V((0, 0, 0.08))
+    # (She sits facing the window; he comes up on her left, so the left hand.)
 
     def want(R, fi, mt=mt):                           # her palm on the stem, above his hand
         G = DF.REC_NOW[mt]
         return V(G["palm"]["R"][fi]) + V((0, 0, 0.08))
-    f.R.hold(t_take - 1.4)
-    ct = DF.CT(A.loc(est, "rovers"), f.tag, "R", t_take, want)
+    f.L.hold(t_take - 1.4)
+    ct = DF.CT(A.loc(est, "rovers"), f.tag, "L", t_take, want)
     DF.CONTACTS.append(ct)
-    f.R.add(t_take, ct)
-    f.L.hold(t_take - 1.0).add(t_take + 0.2, V((-0.06, 0.24, 1.30)))   # a hand to her heart
-    nose = V((0.06, 0.22, 1.52))
-    f.R.add(t_take + 1.4, nose).add(t_take + 3.0, nose)
+    f.L.add(t_take, ct)
+    f.R.hold(t_take - 1.0).add(t_take + 0.2, V((0.06, 0.24, 1.30)))    # a hand to her heart
+    nose = V((-0.06, 0.22, 1.52))
+    f.L.add(t_take + 1.4, nose).add(t_take + 3.0, nose)
     f.pitch.add(t_take + 1.4, -6).add(t_take + 3.0, -6)
     t_down = m.bouquet_down
     spot = bouquet_down()[1]
-    ct2 = DF.CT(A.loc(spot + V((0, 0, 0.05)), "rovers"), f.tag, "R", t_down, lambda R, fi, w=spot + V((0, 0, 0.05)): w)
+    ct2 = DF.CT(A.loc(spot + V((0, 0, 0.05)), "rovers"), f.tag, "L", t_down, lambda R, fi, w=spot + V((0, 0, 0.05)): w)
     DF.CONTACTS.append(ct2)
-    f.R.add(t_down - 1.0, V((0.10, 0.36, 1.18))).add(t_down, ct2)
-    m.prop("Bouquet", t_down, bouquet_down(), 6)
+    f.L.add(t_down - 1.0, V((-0.10, 0.36, 1.18))).add(t_down, ct2)
+    bouquet_props(m)
     f.R.add(t_down + 0.8, A.rest("R"))
     f.L.add(t_down + 0.8, A.rest("L"))
     A.busy.append((t_offer - 1.5, t_down + 1.0))
@@ -3387,7 +3518,7 @@ def _couple_gaze(cr, who, g, calm, t_end):
              "rovers": ((cab_root(who).x, cab_root(who).y), RF.CAB_YAW[who])}
     oseats = {"cafe": (SEAT["B" if who == "A" else "A"][0], SEAT["B" if who == "A" else "A"][1]),
               "rovers": tuple(cab_root("B" if who == "A" else "A")[:2])}
-    venues = {"cafe": ("cafe",), "rovers": ("pub", "couple", "snug")}
+    venues = {"cafe": ("cafe",), "rovers": ("pub", "couple", "snug", "jay", "tt", "st")}
 
     def rel(where, xy):
         (x, y), yaw = seats[where]
@@ -3532,6 +3663,11 @@ def _flame_mesh(P, b, o=V((0, 0, 0)), s=1.0):
     P.seg(b, o + V((0, 0, 0.05 * s)), o + V((0, 0, 0.24 * s)), 0.048 * s, 0.004 * s, "ffb030", segs=8, mat=1)
 
 
+MESH_HOOKS = []                                       # fn(P): more kit on the rig (nights.py)
+FAST = ("Bubble",)                                    # name prefixes that move like thrown things (nights.py adds)
+EXTRA_MATS = []                                       # fn() -> material, slots 4.. (nights.py)
+
+
 def build_rig(report):
     sc = bpy.context.scene
     arm_data = bpy.data.armatures.new("Fig_DinCafePropsRig")
@@ -3643,6 +3779,8 @@ def build_rig(report):
     for sg in (1, -1):
         P.seg("UniWheel", o(sg * 0.06, 0, 0), o(sg * 0.075, 0, -sg * CRANK), 0.009, 0.009, "8a8e94", segs=5)
         P.box("UniWheel", o(sg * 0.105, 0, -sg * CRANK), (0.06, 0.09, 0.018), "1c1c1e")
+    for hook in MESH_HOOKS:                     # (the nightly finales' kit: nights.py)
+        hook(P)
     me = bpy.data.meshes.new("Fig_DinCafePropsMesh")
     P.bm.to_mesh(me)
     attr = me.color_attributes.new("Col", 'BYTE_COLOR', 'CORNER')
@@ -3666,6 +3804,8 @@ def build_rig(report):
     me.materials.append(_flame_mat())
     me.materials.append(_see_through("FigBubble", (0.86, 0.94, 1.0), 0.20, (0.55, 0.72, 0.95), 0.25))
     me.materials.append(_see_through("FigBeam", (1.0, 0.93, 0.76), 0.07, (1.0, 0.86, 0.6), 0.6))
+    for make in EXTRA_MATS:                     # slots 4 and on (nights.py)
+        me.materials.append(make())
     ob.parent = arm
     ob.modifiers.new("Armature", 'ARMATURE').object = arm
     report(f"CAFE PROPS: {len(arm.data.bones)} bones, {len(me.vertices)} verts")
@@ -3714,6 +3854,25 @@ def _eval(st, fis, C):
     if k == "fn":
         r = st[1](fis, C)
         return (r[0], r[1], r[2] if len(r) > 2 else None)
+    if k == "wkeys":                                    # along a world path (Keys of points), q fixed or a fn of t
+        _k, keys, q = st
+        P = C["local"](keys)[fis]
+        Q = q(fis / FPS) if callable(q) else np.tile(np.asarray(q, float), (n, 1))
+        return P, Q, None
+    if k == "throw":                                    # out of a hand to a world point (it sticks there)
+        _k, s0, t0, target, t1, kind, spins, q1 = st
+        f0, f1 = C["fi"](t0), max(C["fi"](t1), C["fi"](t0) + 1)
+        off0, qh = held(kind, s0, 0)
+        qb0 = C["qb"][f0]
+        c0 = C["palm"][s0][f0] + DF.qrot(qb0, off0)
+        c1 = np.asarray(target[:], float)
+        u = np.clip((fis - f0) / (f1 - f0), 0.0, 1.0)
+        T = (f1 - f0) / FPS
+        P = c0 + (c1 - c0) * u[:, None]
+        P[:, 2] += 0.5 * G * T * T * u * (1 - u) * 0.6
+        Q = DF.qmul(DF.qyaw(C["yaw"][f0]), DF.qmul(DF.qx(-360.0 * spins * u), qh))
+        Q = np.where((u >= 1.0)[:, None], np.asarray(q1, float), Q)
+        return P, Q, None
     _k, s0, t0, s1, t1, kind, spins = st
     f0, f1 = C["fi"](t0), C["fi"](t1)
     f1 = max(f1, f0 + 1)
@@ -3733,9 +3892,11 @@ def _eval(st, fis, C):
     return Pc - DF.qrot(Q, com), Q, None
 
 
-def _prop_tracks(m, R, recs=None):
-    """{name: (P (N+1,3), Q (N+1,4), S (N+1,3))} for every moving prop."""
+def _prop_tracks(m, R, recs=None, frames=None):
+    """{name: (P (N+1,3), Q (N+1,4), S (N+1,3))} for every moving prop
+    (frames: (first, last): only those are evaluated)."""
     N = DF.N
+    lo, hi = frames or (0, N)
     C = _ctx(m, R, recs)
     out = {}
     for name in DYNAMIC:
@@ -3746,13 +3907,17 @@ def _prop_tracks(m, R, recs=None):
         for j, (t0, st, bl) in enumerate(ev):
             f0 = C["fi"](t0)
             f1 = C["fi"](ev[j + 1][0]) if j + 1 < len(ev) else N + 1
+            if f1 <= lo or f0 > hi:
+                continue
+            cut = f0 < lo                          # (begun before the window: no blend in at its edge)
+            f0, f1 = max(f0, lo), min(f1, hi + 1)
             if f1 <= f0:
                 continue
             fis = np.arange(f0, f1)
             p, q, s = _eval(st, fis, C)
             if p is None:
                 continue
-            if bl and j > 0 and ev[j - 1][1][0] in ("spot", "hand", "local", "fn"):
+            if bl and j > 0 and not cut and ev[j - 1][1][0] in ("spot", "hand", "local", "fn", "wkeys", "hand2"):
                 nb = min(bl, len(fis))
                 pp, qq, _s = _eval(ev[j - 1][1], fis[:nb], C)
                 if pp is not None:
@@ -3805,6 +3970,13 @@ def _prop_tracks(m, R, recs=None):
     fz = 1.0 + 0.16 * np.sin(w * 1153 * tt) + 0.07 * np.sin(w * 2203 * tt)
     out["Flame3"] = (tip, np.tile(Q_ID, (N + 1, 1)), np.maximum(np.stack([on * fl, on * fl, on * fz], 1), 0.001))
     out["Beam"], out["Show"] = _spot_tracks(m, C)
+    for name, src, delay, k in getattr(m, "trails", []):     # (light trails: where src was a moment ago)
+        P, Q, S = out[src]
+        d = int(round(delay * FPS))
+        Pt = np.concatenate([np.repeat(P[:1], d, 0), P[:-d]]) if d else P.copy()
+        St = np.concatenate([np.repeat(S[:1], d, 0), S[:-d]]) if d else S.copy()
+        Ss = np.minimum(S, St)
+        out[name] = (Pt, Q, np.where(Ss > 0.002, Ss * k, 0.001))
     return out
 
 
@@ -3814,16 +3986,26 @@ SPOT_OUT = 0.60                                       # and this far in front of
 
 def _spot_tracks(m, C):
     """The finale's light: the beam from the lantern on the ceiling to him (on
-    while m.beam is), and the Show bone: over and in front of him, scaled by
-    how far down the house lights are (m.dim)."""
+    while m.beam is), or to m.spot_at as m.spot_free says; and the Show bone,
+    over and in front of the lit spot, its scale (x) how far down the house
+    lights are (m.dim), (y) how much spotlight there is on that spot (m.spot),
+    (z) how black the rest of the room goes (m.black)."""
     N = DF.N
     pos, yaw = C["pos"], C["yaw"]
-    m.beam.done()
-    on = np.clip(np.array(DF.sample(m.beam), float), 0.0, 1.0)
-    m.dim.done()
-    dim = np.clip(np.array(DF.sample(m.dim), float), 0.001, 1.0)
+    sample = lambda keys: np.array(DF.sample(keys), float)
+    for k in (m.beam, m.dim, m.spot, m.black, m.spot_free, m.spot_at):
+        k.done()
+    on = np.clip(sample(m.beam), 0.0, 1.0)
+    dim = np.clip(sample(m.dim), 0.001, 1.0)
+    spot = np.clip(sample(m.spot), 0.0, 1.0)
+    black = np.clip(sample(m.black), 0.0, 1.0)
+    free = np.clip(sample(m.spot_free), 0.0, 1.0)[:, None]
+    at = np.array([(v.x, v.y, v.z) for v in DF.sample(m.spot_at)], float)
+    floor = np.array([RF.stage_z(x, y) for x, y in at[:, :2]]) if free.any() else np.zeros(N + 1)
+    at[:, 2] = floor
+    lit = pos * (1.0 - free) + at * free                  # the spot on the floor (his feet, or spot_at)
     lamp = np.array(RF.SPOT_LAMP[:], float)
-    chest = pos + np.array((0.0, 0.0, 1.15))
+    chest = lit + np.array((0.0, 0.0, 1.15))
     d = chest - lamp
     d /= np.linalg.norm(d, axis=1, keepdims=True)
     # Shortest-arc rotation of +z onto d.
@@ -3832,13 +4014,14 @@ def _spot_tracks(m, C):
     w = 1.0 + d[:, 2]
     Qb = np.concatenate([w[:, None], axis], 1)
     Qb /= np.linalg.norm(Qb, axis=1, keepdims=True)
-    reach = (lamp[2] - pos[:, 2]) / np.maximum(0.2, -d[:, 2])        # lens to the floor he stands on
+    reach = (lamp[2] - lit[:, 2]) / np.maximum(0.2, -d[:, 2])        # lens to the floor under the spot
     Sb = np.stack([on, on, np.maximum(0.001, on * reach / 3.2)], 1)
     Sb = np.maximum(Sb, 0.001)
-    fw = np.stack([-np.sin(np.radians(yaw)), np.cos(np.radians(yaw)), np.zeros(N + 1)], 1)
-    Ps = pos + fw * SPOT_OUT + np.array((0.0, 0.0, SPOT_UP))
+    yaw_l = np.where(free[:, 0] > 0.5, np.degrees(np.arctan2(-(lit[:, 0] - lamp[0]), lit[:, 1] - lamp[1])), yaw)
+    fw = np.stack([-np.sin(np.radians(yaw_l)), np.cos(np.radians(yaw_l)), np.zeros(N + 1)], 1)
+    Ps = lit + fw * SPOT_OUT * (1.0 - free) + np.array((0.0, 0.0, SPOT_UP))
     Ps[:, 2] = np.minimum(Ps[:, 2], RF.CARPET + 2.95)
-    Ss = np.repeat(dim[:, None], 3, 1)
+    Ss = np.stack([dim, np.maximum(0.001, dim * spot), np.maximum(0.001, black)], 1)
     # (Off, both hold still: no keys spent following him round the house.)
     idle_q = Qb[np.argmax(on > 0.001)] if (on > 0.001).any() else Qb[0]
     Qb = np.where((on > 0.001)[:, None], Qb, idle_q)
@@ -3937,47 +4120,54 @@ def _uni_track(m, R):
     return H, Y, T, W
 
 
-def write_clip(arm, m, R, clip, report, recs=None):
+def write_clip(arm, m, R, clip, report, recs=None, frames=None):
     """Key every moving café prop for one clip from the mime's record (and the
-    couple's, for what he hands them)."""
+    couple's, for what he hands them). frames: (first, last): only those, the
+    clip starting at the first."""
     N = DF.N
+    lo, hi = frames or (0, N)
     cb = DF._channelbag(arm, f"Fig_DinCafeProps{clip}")
     rest = {b.name: b.matrix_local.copy() for b in arm.data.bones}
     kept = 0
-    tracks = _prop_tracks(m, R, recs)
+    tracks = _prop_tracks(m, R, recs, frames)
+    if frames:
+        tracks = {k: (P[lo:hi + 1], Q[lo:hi + 1], S[lo:hi + 1]) for k, (P, Q, S) in tracks.items()}
     for name, (P, Q, S) in tracks.items():
         bn = f"DinCafeProps_{name}"
         if P is not None:
             locs = P - np.array(rest[bn].translation[:])
             kept += DF._write_rows(cb, bn, "location", locs.T.copy(), 0.002, (0, 0, 0))
             Qc = Q.copy()
-            for i in range(1, N + 1):
+            for i in range(1, len(Qc)):
                 if np.dot(Qc[i], Qc[i - 1]) < 0:
                     Qc[i] = -Qc[i]
             kept += DF._write_rows(cb, bn, "rotation_quaternion", Qc.T.copy(), 0.003, (1, 0, 0, 0))
         kept += DF._write_rows(cb, bn, "scale", S.T.copy(), 0.004 if "Flame" in name else 0.002, (1, 1, 1))
     H, Y, T, W = _uni_track(m, R)
+    if frames:
+        H, Y, T, W = H[lo:hi + 1], Y[lo:hi + 1], T[lo:hi + 1], W[lo:hi + 1]
+    n = len(H)
     name = "DinCafeProps_Uni"
     rs = rest[name]
-    locs = np.empty((N + 1, 3))
-    quats = np.empty((N + 1, 4))
-    for fi in range(N + 1):
+    locs = np.empty((n, 3))
+    quats = np.empty((n, 4))
+    for fi in range(n):
         want = (Matrix.Translation(V(H[fi])) @ Matrix.Rotation(math.radians(Y[fi]), 4, 'Z') @
                 Matrix.Rotation(math.radians(T[fi]), 4, 'Y') @ rs.to_3x3().to_4x4())
         mm = rs.inverted() @ want
         locs[fi] = mm.to_translation()
         q = mm.to_quaternion()
         quats[fi] = (q.w, q.x, q.y, q.z)
-    for i in range(1, N + 1):
+    for i in range(1, n):
         if np.dot(quats[i], quats[i - 1]) < 0:
             quats[i] = -quats[i]
     kept += DF._write_rows(cb, name, "location", locs.T.copy(), 0.002, (0, 0, 0))
     kept += DF._write_rows(cb, name, "rotation_quaternion", quats.T.copy(), 0.002, (1, 0, 0, 0))
-    wq = np.empty((N + 1, 4))
-    for fi in range(N + 1):
+    wq = np.empty((n, 4))
+    for fi in range(n):
         q = Matrix.Rotation(-W[fi], 4, 'Y').to_quaternion()
         wq[fi] = (q.w, q.x, q.y, q.z)
-    for i in range(1, N + 1):
+    for i in range(1, n):
         if np.dot(wq[i], wq[i - 1]) < 0:
             wq[i] = -wq[i]
     kept += DF._write_rows(cb, "DinCafeProps_UniWheel", "rotation_quaternion", wq.T.copy(), 0.003, (1, 0, 0, 0))
@@ -3988,56 +4178,70 @@ def write_clip(arm, m, R, clip, report, recs=None):
     return tracks, H
 
 
-def gate(dinner, lounge, report):
-    """Props rig: the lounge loop starts where the dinner ends and closes on
-    itself; nothing jumps (beyond what a fast throw covers in a frame) or sinks
-    through the floor; the unicycle never jumps."""
-    (Td, Hd), (Tl, Hl) = dinner, lounge
+def gate_seam(a, b, label, report):
+    """Props rig: clip b starts exactly where clip a ends (scale, and place
+    where visible; the unicycle wherever it is)."""
+    (Ta, Ha), (Tb, Hb) = a, b
     ok = True
-    for name in Tl:
-        Pd, Qd, Sd = Td[name]
-        Pl, Ql, Sl = Tl[name]
-        pairs = (("dinner end / lounge start", -1, 0, Td), ("lounge seam", -1, 0, Tl))
-        for label, a, b, src in (("dinner end / lounge start", Sd[-1], Sl[0], None), ("lounge seam", Sl[-1], Sl[0], None)):
-            if np.abs(a - b).max() > 0.02:
-                report(f"CAFE PROPS GATE: {name} scale differs at the {label}")
-                ok = False
-        if Pl is not None:
-            for label, a, b, sa in (("dinner end / lounge start", Pd[-1], Pl[0], Sd[-1]), ("lounge seam", Pl[-1], Pl[0], Sl[-1])):
-                if sa[0] > 0.5 and np.abs(a - b).max() > 0.01:
-                    report(f"CAFE PROPS GATE: {name} moves at the {label}")
-                    ok = False
-            for clip, P, S in (("dinner", Pd, Sd), ("lounge", Pl, Sl)):
-                v = S[:, 0] > 0.5
-                if v.any() and P[v][:, 2].min() < Z0 - 0.01:
-                    report(f"CAFE PROPS GATE: {clip} {name} below the floor")
-                    ok = False
-                j = np.linalg.norm(np.diff(P, axis=0), axis=1)
-                j[~(v[1:] & v[:-1])] = 0
-                if name in ("Show", "Beam"):          # (the light's bone snaps to him as the lights go)
-                    continue
-                lim = 0.75 if name[:-1] in ("Ball", "Club", "Torch", "Flame", "Knife") else 0.40
-                if j.max() > lim:
-                    report(f"CAFE PROPS GATE: {clip} {name} jumps {j.max():.2f} m at {j.argmax() / FPS:.1f}s")
-                    ok = False
-    # Under the Rovers' ceiling (3.20): nothing he throws or blows hits it.
-    for clip, T in (("dinner", Td), ("lounge", Tl)):
-        for name, (P, Q, S) in T.items():
-            if name in ("Show", "Beam") or P is None:
-                continue
-            v = S[:, 0] > 0.5
-            inside = v & (P[:, 0] > -3.75) & (P[:, 0] < 6.75) & (P[:, 1] > -16.6) & (P[:, 1] < -10.05)
-            if inside.any() and P[inside][:, 2].max() > 3.05:
-                k = np.nonzero(inside)[0][np.argmax(P[inside][:, 2])]
-                report(f"CAFE PROPS GATE: {clip} {name} at {P[k, 2]:.2f} m under the Rovers ceiling at {k / FPS:.1f}s")
-                ok = False
-    if np.abs(Hd[-1] - Hl[0]).max() > 0.01 or np.abs(Hl[-1] - Hl[0]).max() > 0.01:
-        report("CAFE PROPS GATE: the unicycle is not parked at the seams")
-        ok = False
-    for clip, H in (("dinner", Hd), ("lounge", Hl)):
-        j = np.linalg.norm(np.diff(H, axis=0), axis=1)
-        if j.max() > 0.30:
-            report(f"CAFE PROPS GATE: {clip} unicycle jumps {j.max():.2f} m at {j.argmax() / FPS:.1f}s")
+    for name in Tb:
+        Pa, Qa, Sa = Ta[name]
+        Pb, Qb, Sb = Tb[name]
+        if np.abs(Sa[-1] - Sb[0]).max() > 0.02:
+            report(f"CAFE PROPS GATE: {name} scale differs at the {label}")
             ok = False
+        if Pb is not None and Sa[-1][0] > 0.5 and np.abs(Pa[-1] - Pb[0]).max() > 0.01:
+            report(f"CAFE PROPS GATE: {name} moves at the {label}")
+            ok = False
+    if np.abs(Ha[-1] - Hb[0]).max() > 0.01:
+        report(f"CAFE PROPS GATE: the unicycle moves at the {label}")
+        ok = False
+    return ok
+
+
+def gate_clip(T, H, clip, report):
+    """Nothing jumps (beyond what a fast throw covers in a frame), sinks through
+    the floor or rises into the Rovers' ceiling; the unicycle never jumps."""
+    ok = True
+    for name, (P, Q, S) in T.items():
+        if P is None:
+            continue
+        v = S[:, 0] > 0.5
+        if v.any() and P[v][:, 2].min() < Z0 - 0.01:
+            report(f"CAFE PROPS GATE: {clip} {name} below the floor")
+            ok = False
+        if name in ("Show", "Beam"):                  # (the light's bone snaps to him as the lights go)
+            continue
+        j = np.linalg.norm(np.diff(P, axis=0), axis=1)
+        j[~(v[1:] & v[:-1])] = 0
+        lim = 0.75 if name[:-1] in ("Ball", "Club", "Torch", "Flame", "Knife") or name.startswith(FAST) else 0.40
+        if j.max() > lim:
+            report(f"CAFE PROPS GATE: {clip} {name} jumps {j.max():.2f} m at {j.argmax() / FPS:.1f}s")
+            ok = False
+        inside = v & (P[:, 0] > -3.75) & (P[:, 0] < 6.75) & (P[:, 1] > -16.6) & (P[:, 1] < -10.05)
+        if inside.any() and P[inside][:, 2].max() > 3.05:
+            k = np.nonzero(inside)[0][np.argmax(P[inside][:, 2])]
+            report(f"CAFE PROPS GATE: {clip} {name} at {P[k, 2]:.2f} m under the Rovers ceiling at {k / FPS:.1f}s")
+            ok = False
+    j = np.linalg.norm(np.diff(H, axis=0), axis=1)
+    if j.max() > 0.30:
+        report(f"CAFE PROPS GATE: {clip} unicycle jumps {j.max():.2f} m at {j.argmax() / FPS:.1f}s")
+        ok = False
+    return ok
+
+
+def gate(dinner, lounge, report, fins=None):
+    """Props rig: every clip sound (gate_clip); the lounge loop closes on itself
+    and starts where the dinner (or each night's finale, fins) ends."""
+    ok = gate_clip(*dinner, "dinner", report) & gate_clip(*lounge, "lounge", report)
+    for night, fk in (fins or {}).items():
+        ok &= gate_clip(*fk, f"finale {night}", report)
+        ok &= gate_seam(fk, lounge, f"finale {night} end / lounge start", report)
+    if not fins:
+        ok &= gate_seam(dinner, lounge, "dinner end / lounge start", report)
+    ok &= gate_seam(lounge, lounge, "lounge seam", report)
     report(f"CAFE PROPS GATE {'passed' if ok else 'FAILED'}")
     return ok
+
+
+import nights  # noqa: E402,F401  (the other nights' finales: their kit and programmes)
+import tables  # noqa: E402  (after the finale: his round of the tables)

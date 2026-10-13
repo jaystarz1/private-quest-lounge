@@ -5,15 +5,14 @@
 #   - three regulars on the bar stools drink their pints down and set the
 #     empties on the drip tray; the barman collects each, refills it at the
 #     fourth handpump (the handle moves, the glass fills) and serves it back;
-#   - the pair at the drinking shelf by the door and the darts fan take their
+#   - the couple at the table beside Jay's and the darts fan take their
 #     empties up to the bar themselves, wait while the barman pours, and carry
 #     the refill back;
 #   - the barmaid works the room from her station at the end of the bar with a
 #     tray: she clears the couple at the first booth table and brings them a
 #     pint of bitter and a glass of white (the barman pulls her pints, she
-#     pours the wine from the bottle), keeps the pianist's stout on the piano
-#     topped up, and twice a loop brings the reserved table by the window a
-#     fresh red wine and a pint (two sets, so that table is never empty);
+#     pours the wine from the bottle) and keeps the pianist's stout on the piano
+#     topped up (Jay's table by the window has glasses he picks up himself);
 #   - four people play darts the whole loop: step up, three darts, pull them,
 #     chalk the score; now and then a player goes to the Gents/Ladies or up to
 #     the bar for a refill straight after their turn, and is back for the next;
@@ -1350,8 +1349,16 @@ def idle(m, rng):
 # --- The cast -----------------------------------------------------------------
 BAR_FEET = ((-0.12, 0.20, 0.36), (0.12, 0.22, 0.36))
 STOOL_Y = -13.92
-TF_SPOT = (1.25, -10.90, TABLE_Z)
-TM_SPOT = (1.38, -11.28, TABLE_Z)
+# The first booth's west table (rovers_figures BOOTH_TABLES "TT"): their glasses
+# on its west side, where the barmaid reaches them from the floor by the lobby.
+TF_SPOT = (0.66, -10.95, TABLE_Z)
+TM_SPOT = (0.67, -11.21, TABLE_Z)
+# The second booth's east table ("ST"): the couple from the drinking shelf, side
+# by side on the cushion facing the room (a stool there would stand against
+# the snug's), their glasses in front of them.
+SM_SPOT = (4.50, -10.92, TABLE_Z)
+SF_SPOT = (4.91, -10.92, TABLE_Z)
+SEAT_FEET = {"bench": ((-0.11, 0.43, 0.42), (0.11, 0.43, 0.42)), "stool": ((-0.12, 0.42, 0.42), (0.12, 0.40, 0.42))}
 
 
 def _cast():
@@ -1367,32 +1374,34 @@ def _cast():
     # The booth table couple is served by the barmaid: a glass of white for
     # her, a pint of bitter for him (he drinks left-handed so both glasses sit
     # on the side she serves from).
+    tx = BOOTH_TABLES["TT"][0]
     TF = Mover("TblF", dict(sex="f", skin="eec3a4", hair="d4b26a", hair_style="long", top="3a6fb0", legs="2d3550",
-                            sleeves="long", lips="b04a55"), "table", (1.35, -10.40, 180),
-               TF_SPOT, "R", "wine", "L", 6, [6], seat_z=0.55, stand=(0.85, -10.80),
-               slide=(0.85, -10.40), feet=((-0.11, 0.43, 0.42), (0.11, 0.43, 0.42)), drink="white")
+                            sleeves="long", lips="b04a55"), "table", (tx, BENCH_Y, 180),
+               TF_SPOT, "R", "wine", "L", 0, [0], seat_z=0.55, stand=(1.48, -10.82),
+               slide=(1.48, BENCH_Y), feet=SEAT_FEET["bench"], drink="white")
     TM = Mover("TblM", dict(sex="m", skin="e0b08f", hair="9a948c", top="283a5c", legs="3a3f4a", sleeves="long",
-                            glasses="2a2a2a"), "table", (1.50, -11.78, 0), TM_SPOT, "L", "pint",
-               "G", -6, [-6], seat_z=0.56, stand=(1.50, -12.18), feet=((-0.12, 0.42, 0.42), (0.12, 0.40, 0.42)))
-    # The shelf pair stand at the short end of the shelf beside the stage now.
+                            glasses="2a2a2a"), "table", (tx, BOOTH_STOOL_Y, 0), TM_SPOT, "L", "pint",
+               "G", 0, [0], seat_z=0.56, stand=(tx, -12.18), feet=SEAT_FEET["stool"])
+    # The pair from the drinking shelf (it made way for the stage) have the
+    # table beside Jay's: her on the cushion, him on the stool; they still take
+    # their own empties up to the bar.
     SM = Mover("ShfM", dict(sex="m", skin="c48b66", hair="2c2420", hair_style="bald", beard=True, top="8a2f2a",
-                            legs="34404f", sleeves="rolled"), "shelf", (-2.07, -10.64, -40),
-               (-2.00, -10.24, SHELF_Z), "L", "pint", "G", -30, [-30], lean_reach=14, drink="stout",
-               routes={"G": [(-2.07, -10.64), (-2.00, -11.02), (-2.62, -11.52), DOOR_IN["G"]],
-                       "bar": [(-2.07, -10.64), (-2.00, -11.02), (-1.55, -11.30), (-0.95, CY),
-                               (O1_STAND[0], CY), O1_STAND]})
+                            legs="34404f", sleeves="rolled"), "table", (4.42, BENCH_Y, 180),
+               SM_SPOT, "L", "pint", "G", 25, [40, 10], seat_z=0.55, stand=(4.15, -10.82),
+               slide=(4.18, BENCH_Y), feet=SEAT_FEET["bench"], drink="stout")
     SF = Mover("ShfF", dict(sex="f", skin="f0c7a8", hair="241a16", hair_style="ponytail", top="e6dfd2",
-                            jacket="2a2422", legs="2a2a30", skirt="2a2a30", sleeves="long"), "shelf",
-               (-1.60, -10.74, 40), (-1.66, -10.24, SHELF_Z), "R", "half", "L", 30, [30], lean_reach=14,
-               drink="lager",
-               routes={"L": [(-1.60, -10.74), (-1.50, -11.15), (-1.50, CY), (-2.75, CY), DOOR_IN["L"]],
-                       "bar": [(-1.60, -10.74), (-1.50, -11.15), (-0.95, CY), (O1_STAND[0], CY), O1_STAND]})
+                            jacket="2a2422", legs="2a2a30", skirt="2a2a30", sleeves="long"), "table",
+               (5.00, BENCH_Y, 180), SF_SPOT, "R", "half", "L", -25, [-40, -10], seat_z=0.55, stand=(5.20, -10.84),
+               slide=(5.20, BENCH_Y), feet=SEAT_FEET["bench"], drink="lager",
+               routes={"L": [(5.20, -10.84), (5.20, -11.60), (4.15, -11.60), (4.15, CY)] + DOOR_VIA["L"] + [DOOR_IN["L"]],
+                       "bar": [(5.20, -10.84), (5.20, -11.60), (4.15, -11.60), (4.15, CY), (O1_STAND[0], CY),
+                               O1_STAND]})   # (round their table's end: the snug is south of her)
     # The darts fan by the end of the bar return; her way to the bar keeps
     # clear of the darts players' waiting row.
     DF = Mover("DtF", dict(sex="f", skin="f1c9ab", hair="a0402a", hair_style="long", top="c9a63a", legs="26263a",
                            skirt="26263a", sleeves="long", lips="b04a55"), "shelf", (-0.70, -13.95, 161),
                (-0.95, -14.30, 1.06), "R", "half", "L", 0, [0, 0, -25, 35], lean_reach=14, drink="cider",
-               routes={"bar": [(-0.70, -13.95), (-0.45, -13.45), (1.20, -13.45), O1_STAND]})
+               routes={"bar": [(-0.70, -13.95), (-0.45, -13.45), (O1_STAND[0], -13.40), O1_STAND]})
     DF.kinds = ["listen", "listen", "clap", "talk", "room", "laugh"]
     for m in (A, B, C):
         m.kinds = ["talk", "talk", "listen", "laugh", "room", "lean"]
@@ -1840,6 +1849,7 @@ def _dart_sequence(players, n, slack, pours=None, starts=None, pause=None):
         turns.append((tag, pos, g))
     T = 0.3
     out = []
+    owed = set()                              # a bar trip that found the barman busy: tried again next turn
     for i, (tag, pos, g) in enumerate(turns):
         m = players[tag]
         last = i == n - 1
@@ -1848,6 +1858,8 @@ def _dart_sequence(players, n, slack, pours=None, starts=None, pause=None):
             T = pause[1]
         out.append(T)
         trip = DART_TRIPS.get(i) if i < n - 1 else None
+        if trip is None and tag in owed and i < n - 1 and pours is not None:
+            trip = "bar"
         release, gone = _dart_turn(m, T, pos, rng, [(gg, z) for gg, z, _t in marks] if last else None, trip)
         w0, w1 = m.writes[-1]
         g["scale"].add(0.0, 0.001).add(w0, 0.001).add(w1, 1.0)
@@ -1858,6 +1870,10 @@ def _dart_sequence(players, n, slack, pours=None, starts=None, pause=None):
             done = None
             if trip == "bar" and m.g:
                 done = _dart_bar(m, release, t_by, pours)
+                if done is None:
+                    owed.add(tag)
+                else:
+                    owed.discard(tag)
             if done is None:
                 done = _dart_wc(m, release, t_by)
             if done is None:
@@ -1906,40 +1922,85 @@ def _darts_game(players, pours):
 # barman's refills for the three on the stools (collect times). The booth
 # couple no longer fetch their own: the barmaid serves them.
 # --- The stage (build-penthouse builds it from these) ---------------------------
-# A little stage in the stand-up corner, between the Gents door and the front
-# window: 0.30 m up, its front corner cut on the diagonal so it faces the room,
-# a step along that cut, red drapes on the two walls behind it, footlights and a
-# spotlight on the ceiling. The drinking shelf is shorter (it starts east of
-# the stage) and the café couple's table stands in front of it (cafe_figures).
-STAGE_POLY = ((-3.70, -10.10), (-2.35, -10.10), (-2.35, -10.65), (-2.95, -11.25), (-3.70, -11.25))
+# Jay: a stage in the stand-up corner, between the Gents door and the front
+# window, now the whole width of that corner (the drinking shelf is gone): 0.30
+# m up, from the party wall to the lobby's side wall, its south-east corner cut
+# on the diagonal to face the room with a step along the cut, red drapes on the
+# three walls round it, footlights along the front and a spotlight on the
+# ceiling out over the room.
+STAGE_POLY = ((-3.70, -10.10), (-1.44, -10.10), (-1.44, -10.80), (-2.09, -11.45), (-3.10, -11.45),
+              (-3.30, -11.25), (-3.70, -11.25))
 STAGE_TOP = CARPET + 0.30
-STAGE_STEP = ((-2.35, -10.65), (-2.95, -11.25), (-2.794, -11.406), (-2.194, -10.806))
+STAGE_STEP = ((-1.44, -10.80), (-2.09, -11.45), (-1.934, -11.606), (-1.284, -10.956))   # 0.22 m deep along the cut
+LOBBY_WALL_X = -1.42                               # the lobby's side wall (its pub face): the stage's east end
 STEP_TOP = CARPET + 0.15
-SHELF_X = (-2.27, -1.50)
 STAGE_TABLE = (-3.46, -10.34)                      # his prop table (knife block on it)
 STAGE_TABLE_TOP = STAGE_TOP + 0.70
 BUCKET = (-3.48, -10.80)                           # the bubble bucket
 BUCKET_TOP = STAGE_TOP + 0.26
-CAB_TABLE = (-2.25, -11.85)                        # the café couple's table, front row
-CAB_TOP = CARPET + 0.72
-CAB_CHAIRS = {"A": (-2.65, -12.24), "B": (-2.00, -12.32)}
-CAB_SEAT = CARPET + 0.46
-SPOT_LAMP = Vector((-1.20, -11.80, 3.00))          # the spotlight's lens
+SPOT_LAMP = Vector((-0.80, -12.30, 3.00))          # the spotlight's lens, out over the room
+# His steamer trunk at the back by the lobby wall: each night's kit comes out of
+# it (cafe_figures / nights.py), and goes back in.
+TRUNK = (-1.84, -10.38)
+TRUNK_SIZE = (0.74, 0.44, 0.46)
+TRUNK_TOP = STAGE_TOP + TRUNK_SIZE[2]
+TRUNK_AT = (-2.02, -10.86)                         # where he stands to reach into it
+
+
+def _in_poly(x, y, poly, pad=0.0):
+    """Inside the polygon poly (any winding; the stage's is not convex: a notch
+    at its south-west corner), at least pad metres from every edge."""
+    n = len(poly)
+    inside = False
+    for i in range(n):
+        (ax, ay), (bx, by) = poly[i], poly[(i + 1) % n]
+        if (ay > y) != (by > y) and x < ax + (y - ay) * (bx - ax) / (by - ay):
+            inside = not inside
+    if not inside:
+        return False
+    if pad > 0.0:
+        for i in range(n):
+            (ax, ay), (bx, by) = poly[i], poly[(i + 1) % n]
+            ex, ey = bx - ax, by - ay
+            L2 = ex * ex + ey * ey
+            u = 0.0 if L2 < 1e-12 else max(0.0, min(1.0, ((x - ax) * ex + (y - ay) * ey) / L2))
+            if math.hypot(x - ax - u * ex, y - ay - u * ey) < pad:
+                return False
+    return True
 
 
 def on_stage(x, y, pad=0.0):
     """Is (x, y) on the stage (pad metres in from its edges)?"""
-    return (-3.70 + pad <= x <= -2.35 - pad and -11.25 + pad <= y <= -10.10 - pad and
-            (y - x) >= -8.30 + pad * 1.414)
+    return _in_poly(x, y, STAGE_POLY, pad)
 
 
 def stage_z(x, y):
     """Floor height under (x, y) in the Rovers: the stage, its step or the carpet."""
     if on_stage(x, y):
         return STAGE_TOP
-    if -8.30 - 0.22 * 1.414 <= (y - x) < -8.30 and -14.20 <= x + y <= -13.00:
+    if _in_poly(x, y, STAGE_STEP):
         return STEP_TOP
     return CARPET
+
+
+# --- The window booths ------------------------------------------------------------
+# Two booths under the front windows, a table at each of their two cushions
+# (Jay: room made by dividing them): in the first the blonde lady in blue and
+# her partner, and the café couple beside them; in the second Jay's table (its
+# bench cushion and stool are the visitors') and the couple who used to stand at
+# the drinking shelf. Each table: one on the bench facing the room, one on a
+# stool facing the window.
+BOOTH_TABLES = {"TT": (0.89, -11.05), "CT": (2.11, -11.05), "JT": (3.54, -11.05), "ST": (4.70, -11.05)}
+BENCH_Y, BOOTH_STOOL_Y = -10.40, -11.78
+CAB_TABLE = BOOTH_TABLES["CT"]                     # the café couple's table
+CAB_TOP = TABLE_Z
+CAB_SEATS = {"A": (CAB_TABLE[0], BOOTH_STOOL_Y, 0.0), "B": (CAB_TABLE[0], BENCH_Y, 180.0)}   # her stool, his cushion
+CAB_SEAT = {"A": CARPET + 0.46, "B": 0.55}         # seat tops
+CAB_STAND = {"A": (CAB_TABLE[0], -12.18), "B": (1.52, -10.82)}     # where each stands to sit down (he slides along)
+CAB_SLIDE = {"B": (1.52, BENCH_Y)}
+# Jay's table: two glasses he and his guest can pick up and drink from (the
+# client makes them; build-penthouse marks where they stand).
+JAY_GLASSES = {"red": (BOOTH_TABLES["JT"][0] - 0.13, -10.93), "pint": (BOOTH_TABLES["JT"][0] + 0.10, -11.20)}
 
 
 # --- The café mime's shows (cafe_figures) -------------------------------------
@@ -1948,19 +2009,27 @@ def stage_z(x, y):
 # the shelf couple, the darts players (their game stops) and the darts fan turn
 # round to him, the bar regulars and the booth couple look over, the bathers
 # stop their game.
-MIME_PUB = (-3.00, -10.68)                         # on the stage
-MIME_PUB_FACE = -128.0                             # to the room
-CAB_YAW = {k: heading(v, MIME_PUB) for k, v in CAB_CHAIRS.items()}
-STAGE_WAY = ((-1.30, -11.30), (-2.20, -11.28), (-2.58, -11.04))   # in from the door, onto the step
+MIME_PUB = (-2.45, -10.80)                         # centre stage
+MIME_PUB_FACE = heading(MIME_PUB, (0.5, -12.8))    # to the room
+CAB_YAW = {k: v[2] for k, v in CAB_SEATS.items()}
+STAGE_WAY = ((-1.10, -11.30), (-1.55, -11.10), (-1.90, -10.85))   # in from the door, up the step
 MIME_TUB = (-9.75, -5.05)                          # north of the hot tub, facing the bathers
 SHOW = {"pub": (121.0, 209.0), "tub": (239.0, 325.0)}
 # Who watches, and how: "turn" (standing: they turn round to him), "look"
 # (seated: head round, and round on the stool when he is behind them), "bathe"
 # (in the tub: the game waits). Hands free: everyone claps his last bow.
-WATCHERS = {"SM": "turn", "SF": "turn", "DF": "turn", "A": "look", "B": "look", "C": "look", "TF": "look",
+WATCHERS = {"SM": "look", "SF": "look", "DF": "turn", "A": "look", "B": "look", "C": "look", "TF": "look",
             "TM": "look", "TubA": "bathe", "TubB": "bathe", "TubS": "bathe",
             "DtA": "turn", "DtB": "turn", "DtC": "turn", "DtD": "turn"}
 SWIVEL = {"A": 75.0, "B": 75.0, "C": 75.0, "TM": 40.0}     # how far round on their stool (deg)
+# After the finale the mime goes round the tables instead (tables.py), at the
+# same marks of every round (the lounge loop is whole PHASEs). At the booth
+# couple's table and the shelf couple's: where he stands, when he gets there and
+# when his bow is over (seconds into the loop), who watches him (in their After
+# clip; they are never away then) and where they sit.
+TABLE_VISITS = {"tt": ((0.38, -11.45), 241.0, 281.0, ("TF", "TM"),
+                       ((BOOTH_TABLES["TT"][0], BENCH_Y), (BOOTH_TABLES["TT"][0], BOOTH_STOOL_Y))),
+                "st": ((4.68, -11.56), 290.0, 338.0, ("SM", "SF"), ((4.42, BENCH_Y), (5.00, BENCH_Y)))}
 
 
 def show_span(key):
@@ -2383,8 +2452,8 @@ def _play(fig, rng, segs, rest_l, rest_r, key_z):
 
 
 PATTERN = dict(
-    wc=[("A", 15, 70), ("SF", 22, 70), ("TM", 150, 70), ("C", 180, 70), ("SM", 236, 70), ("TF", 240, 70)],
-    runs=[("DF", 24), ("SM", 55), ("SF", 265)],
+    wc=[("A", 15, 70), ("SF", 22, 70), ("TF", 21, 70), ("SM", 60, 70), ("TM", 150, 70), ("C", 180, 70)],
+    runs=[("DF", 24), ("SM", 167), ("SF", 225)],
     bar=[("C", 48), ("B", 97), ("A", 150), ("B", 255), ("C", 292), ("A", 320)],
 )
 
@@ -2394,25 +2463,19 @@ PATTERN = dict(
 # the tray rests on the bar there, with the red and the white beside it. She
 # pours the wine herself from the bottle into a glass standing on the tray;
 # pints she sets on the bar at O2 for the barman, who pulls them at the fourth
-# pump like any other refill. The reserved table by the front window (TABLES_A
-# second table, seats Seat_RovA3/A4/TA2 left free for visitors) has two sets of
-# a red wine and a pint of bitter: twice a loop she brings the fresh set, takes
-# the old one back and parks it on the bar until the next round, so the table
-# always has its drinks; they go down slowly between rounds.
+# pump like any other refill. Jay's table by the front window (BOOTH_TABLES
+# "JT", seats Seat_RovA3 / Seat_RovTA3 left free for visitors) is not hers any
+# more: its two glasses are the client's, for him and his guest to drink from.
 STN = (0.95, -13.98)                               # where she stands at her station
 TRAY_SPOT = Vector((0.95, -14.48, 1.06))
 BOTTLE_SPOT = {"red": Vector((0.58, -14.42, 1.06)), "white": Vector((0.62, -14.28, 1.06))}
 PARK = {"wine": Vector((0.72, -14.27, 1.06)), "pint": Vector((1.20, -14.27, 1.06))}
 O2 = Vector((1.20, -14.47, 1.06))                  # where the barman fills her pints
-JAY = {"wine": Vector((3.89, -10.95, TABLE_Z)), "pint": Vector((3.89, -11.22, TABLE_Z))}
-JAY_TABLE = Vector((4.15, -11.05, 0.0))
-LEFT_AT = 0.15                                     # what a round on the reserved table is down to
 PNO_SPOT = Vector((-3.17, -15.05, 1.35))           # the pianist's stout, on top of the piano
 PNO_SEAT = (-2.62, -15.50, 90)
 TRAY_HOLD = Vector((-0.26, 0.24, 1.12))            # left wrist carrying the tray
 WTR_STOPS = {                                      # stand, what she faces, route out from the station
-    "JT": ((3.58, -11.00), (4.15, -11.02), [STN, (1.30, -12.90), (3.10, -11.95), (3.58, -11.00)]),
-    "TT": ((1.00, -11.20), (1.25, -10.90), [STN, (0.80, -12.60), (1.00, -11.20)]),
+    "TT": ((0.36, -11.08), (0.66, -11.08), [STN, (0.36, -12.60), (0.36, -11.08)]),
     "PS": ((-2.82, -14.60), (-3.17, -15.05), [STN, (0.60, CY), DART_HALL, DART_GAP, (-2.55, -14.05),
                                               (-2.82, -14.60)]),
 }
@@ -2456,15 +2519,13 @@ class Waitress:
             b["wine"] = w
             self.bottles[w] = b
         self.g = {}
-        for name, size, drink in (("JRa", "wine", "red"), ("JPa", "pint", "bitter"), ("JRb", "wine", "red"),
-                                  ("JPb", "pint", "bitter"), ("TFw", "wine", "white"), ("TMp", "pint", "bitter"),
+        for name, size, drink in (("TFw", "wine", "white"), ("TMp", "pint", "bitter"),
                                   ("PNs", "pint", "stout"),
                                   ("TAf", "pineapple", "colada"), ("TBf", "highball", "sunrise"),
                                   ("TSf", "highball", "punch"), ("TAx", "pineapple", "colada"),
                                   ("TBx", "highball", "sunrise"), ("TSx", "highball", "punch")):
             self.g[name] = f.glass(name, size, drink)
         self.fills = {n: [] for n in self.g}           # (t0, t1, value): a step when t0 == t1
-        self.drain = {}                                # reserved-table glass -> {"placed", "collected"}
         self.jobs = []                                 # (t0, t1, label)
         self.visits = []                               # (t0, t1, who) at a customer
         self.waits = []                                # how long each of her pints waited for the barman
@@ -2702,34 +2763,6 @@ class Waitress:
         return self.back(tp, "R")
 
     # jobs ------------------------------------------------------------------
-    def job_jay(self, t, pours, give, take):
-        """Fresh set `give` to the reserved table, set `take` back to the bar."""
-        gw, gp = self.g["JR" + give], self.g["JP" + give]
-        ow, op = self.g["JR" + take], self.g["JP" + take]
-        t, t_s = self.to_barman(t, gp, PARK["pint"], pours)
-        t = self.shift(t, gw, PARK["wine"], ("T", 3))
-        t = self.pour(t, "red", 3, gw)
-        t = self.wait(t, t_s + 0.4)
-        t = self.shift(t, gp, O2, ("T", 2), "L", 20)
-        t = self.lift_tray(t)
-        t = self.go(t, "JT")
-        v0 = t
-        t = self.shift(t, ow, JAY["wine"], ("T", 1), lean=36, lean_b=22)
-        self.drain.setdefault(ow["name"], {})["collected"] = [e[0] for e in ow["events"] if e[1] == "R"][-1]
-        self.drain.setdefault(op["name"], {})
-        t = self.shift(t, gw, ("T", 3), JAY["wine"], lean=22, lean_b=30)
-        self.drain.setdefault(gw["name"], {})["placed"] = [e[0] for e in gw["events"] if e[1] == "spot"][-1]
-        t = self.shift(t, op, JAY["pint"], ("T", 0), lean=36, lean_b=22)
-        self.drain[op["name"]]["collected"] = [e[0] for e in op["events"] if e[1] == "R"][-1]
-        t = self.shift(t, gp, ("T", 2), JAY["pint"], lean=22, lean_b=30)
-        self.drain.setdefault(gp["name"], {})["placed"] = [e[0] for e in gp["events"] if e[1] == "spot"][-1]
-        self.visits.append((v0, t, "jay"))
-        t = self.go_back(t, "JT")
-        t = self.set_tray(t)
-        t = self.shift(t, ow, ("T", 1), PARK["wine"])
-        t = self.shift(t, op, ("T", 0), PARK["pint"], "L", 20)
-        return t
-
     def job_table(self, t, pours, TF, TM):
         """Clear the booth couple, then bring her white and his bitter."""
         w, p = self.g["TFw"], self.g["TMp"]
@@ -2887,31 +2920,12 @@ class Waitress:
         self.hands(LOOP)
 
     def finish(self):
-        """Fill keys (with the reserved table's slow drain across the seam)
-        and prop segments."""
+        """Fill keys and prop segments."""
         g = self.g
-        for give, take in (("b", "a"), ("a", "b")):
-            for kind in ("JR", "JP"):
-                name = kind + give
-                d = self.drain[name]
-                placed = d["placed"]
-                coll = self.drain[name].get("collected")
-                if coll is None or coll < placed:      # on the table across the seam
-                    coll = self.drain[name]["collected"]
-                    span = coll + LOOP - placed
-                    v_seam = 1.0 - (1.0 - LEFT_AT) * (LOOP - placed) / span
-                    ev = [(0.0, coll, LEFT_AT)] + self.fills[name] + [(placed, LOOP, v_seam)]
-                    g[name]["fill"] = _fill_keys(ev, v_seam)
-                else:
-                    ev = self.fills[name] + [(placed, coll, LEFT_AT)]
-                    g[name]["fill"] = _fill_keys(ev, LEFT_AT)
         for name in ("TFw", "TMp", "PNs", "TAf", "TBf", "TSf", "TAx", "TBx", "TSx"):
             g[name]["fill"] = _fill_keys(self.fills[name], 0.001)
-        start = {"JRa": ("spot", JAY["wine"]), "JPa": ("spot", JAY["pint"]), "JRb": ("spot", PARK["wine"]),
-                 "JPb": ("spot", PARK["pint"])}
         for name, gg in g.items():
-            mode, spot = start.get(name, ("hidden", None))
-            gg["segs"] = segs_from(gg["events"], LOOP, mode, spot)
+            gg["segs"] = segs_from(gg["events"], LOOP, "hidden", None)
         self.tray["segs"] = segs_from(self.tray["events"], LOOP, "spot", (TRAY_SPOT.copy(), _rz(180)))
         for w, b in self.bottles.items():
             b["segs"] = segs_from(b["events"], LOOP, "spot", BOTTLE_SPOT[w])
@@ -3125,8 +3139,8 @@ class _Txn:
             setattr(o, a, v)
 
 
-WTR_ORDERS = (("jay1", "table", "piano", "jay2", "tub"), ("jay1", "table", "tub", "piano", "jay2"),
-              ("jay1", "tub", "table", "piano", "jay2"))
+WTR_ORDERS = (("table", "piano", "tub"), ("table", "tub", "piano"), ("tub", "table", "piano"),
+              ("piano", "table", "tub"))
 
 
 def _waitress(cast, P, pours, report=None, order=None):
@@ -3149,10 +3163,8 @@ def _waitress(cast, P, pours, report=None, order=None):
     tub = {k: m for k, m in cast.items() if getattr(m, "tub", False)}
     for m in tub.values():
         attrs.append((m.f, "_yaw"))
-    every = {"jay1": (6.0, lambda t: W.job_jay(t, pours, "b", "a")),
-             "table": (0.0, lambda t: W.job_table(t, pours, TF, TM)),
+    every = {"table": (0.0, lambda t: W.job_table(t, pours, TF, TM)),
              "piano": (0.0, lambda t: W.job_piano(t, pours, P)),
-             "jay2": (165.0, lambda t: W.job_jay(t, pours, "a", "b")),
              "tub": (0.0, lambda t: W.job_tub(t, tub))}
     jobs = [(label, *every[label]) for label in (order or WTR_ORDERS[0]) if label != "tub" or tub]
     t_prev = 0.0
@@ -3160,7 +3172,6 @@ def _waitress(cast, P, pours, report=None, order=None):
         start = max(earliest, t_prev + 4.0)
         fails = []
         for attempt in range(400):
-            drain = {k: dict(v) for k, v in W.drain.items()}
             tx = _Txn(lists(), attrs)
             n_vis, n_wait = len(W.visits), len(W.waits)
             W.stay(start)
@@ -3183,7 +3194,6 @@ def _waitress(cast, P, pours, report=None, order=None):
             if not bad:
                 break
             tx.rollback()
-            W.drain = drain
             fails.append(why)
             start += 1.0
         else:
@@ -3252,6 +3262,13 @@ def _people(pattern=None, report=None, watch=True):
     wrng = random.Random("mime-watch")
     for key in (WATCHERS if watch else ()):
         watch_show(cast[key], key, wrng)
+    if not watch:                                     # after the finale: the mime at their table
+        for spot, a, b, keys, _seats in TABLE_VISITS.values():
+            for key in keys:
+                m = cast[key]
+                if any(t0 - 2.0 < b + 2.0 and a - 2.0 < t1 + 2.0 for t0, t1, _k in m.trips):
+                    raise RuntimeError(f"{m.f.tag} is away while the mime is at their table ({a:.0f}-{b:.0f}s)")
+                _watch(m, key, wrng, spot, a + 1.0, b, [b - 2.4])
     P = Pianist()
     W = _waitress(cast, P, pours, report, pattern.get("wtr"))
     for m in cast.values():

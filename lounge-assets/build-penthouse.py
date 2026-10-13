@@ -3586,8 +3586,9 @@ for nm, z1, z2, mat in (("DadoCap", WZ0 - 0.02, WZ0 + 0.03, M_RV_MAHOG), ("Pictu
 # Window stools inside (mahogany inner sills).
 import rovers_figures as RVF
 for k, (x1, x2) in enumerate(WIN_N):
-    if k == 0:                                     # (the stage drapes cover its west part)
-        x1 = RVF.STAGE_POLY[1][0] + 0.05
+    if x2 < RVF.STAGE_POLY[1][0] + 0.05:           # (behind the stage drapes)
+        continue
+    x1 = max(x1, RVF.STAGE_POLY[1][0] + 0.05)
     rv_box(f"RvShellStoolN{k}", x1 - 0.05, x2 + 0.05, RV_IY2 - 0.06, RV_Y2 - RV_T / 2 - 0.04, WZ0, WZ0 + 0.04, M_RV_MAHOG)
 for k, (y1, y2) in enumerate(WIN_E):
     rv_box(f"RvShellStoolE{k}", RV_IX2 - 0.06, RV_X2 - RV_T / 2 + 0.04, y1 - 0.05, y2 + 0.05, WZ0, WZ0 + 0.04, M_RV_MAHOG)
@@ -3707,11 +3708,14 @@ def rv_stool(tag, x, y, h, r=0.17):
     rv_cyl(f"RvFurnStool{tag}Leg", x, y, RV_FZ + (h - 0.06) / 2, 0.03, h - 0.06, M_RV_MAHOG, verts=6)
     rv_cyl(f"RvFurnStool{tag}Ring", x, y, RV_FZ + 0.25, r * 0.8, 0.02, M_RV_BRASS, verts=10)
     rv_cyl(f"RvFurnStool{tag}Foot", x, y, RV_FZ + 0.015, r * 0.9, 0.03, M_RV_MAHOG, verts=10)
-TABLES_A = [(1.50, -11.05), (4.15, -11.05)]
+# Two tables in each booth, one at each cushion (rovers_figures BOOTH_TABLES).
+TABLES_A = [RVF.BOOTH_TABLES[k] for k in ("TT", "CT", "JT", "ST")]
 TABLES_E = [(5.35, -12.05), (5.35, -13.25)]       # dinner_figures SNUG_TABLE / STOOL_X
+TABLES_A_STOOL = TABLES_A[:3]                     # (the fourth's couple sit side by side on the cushion)
 for k, (x, y) in enumerate(TABLES_A):
     rv_table(f"A{k}", x, y)
-    rv_stool(f"A{k}", x, -11.78, 0.46)
+    if (x, y) in TABLES_A_STOOL:
+        rv_stool(f"A{k}", x, RVF.BOOTH_STOOL_Y, 0.46)
 for k, (x, y) in enumerate(TABLES_E):
     rv_table(f"E{k}", x, y)
     rv_stool(f"E{k}", 4.65, y, 0.46)
@@ -3724,22 +3728,18 @@ for k, (x, y) in enumerate(BAR_STOOLS):
     if k in (0, 4):
         continue
     rv_stool(f"B{k}", x, y, 0.75, r=0.18)
-# Drinking shelf under the window west of the lobby (the stand-up end), east
-# of the stage now (rovers_figures SHELF_X).
 import rovers_figures as RVF
-rv_box("RvFurnShelf", RVF.SHELF_X[0], RVF.SHELF_X[1], RV_IY2 - 0.28, RV_IY2, 1.05, 1.09, M_RV_MAHOG)
-for k, x in enumerate((RVF.SHELF_X[0] + 0.12, RVF.SHELF_X[1] - 0.12)):
-    rv_box(f"RvFurnShelfBracket{k}", x - 0.02, x + 0.02, RV_IY2 - 0.24, RV_IY2, 0.85, 1.05, M_RV_IRON)
 
 # --- The stage: the stand-up corner between the Gents and the front window ----
-# Jay: a small stage for the mime, to the right of the Gents in the stand-up
-# area; his finale plays there with the pub lights down and a spotlight on him.
-# A 0.30 m platform of boards on a mahogany skirt with a brass nosing, its
-# front corner cut on the diagonal to face the room and a step along the cut;
-# red velvet drapes on the two walls behind it under a gold-fringed pelmet;
-# footlights along the front; a theatre spotlight hung from the ceiling over the
-# floor (the beam is the café prop rig's, the light is Light_G in the client).
-# His prop table (a knife block) and the bubble bucket stand at the back.
+# Jay: a stage for the mime to the right of the Gents in the stand-up area (now
+# the whole corner, from the party wall to the lobby's side wall); his finale
+# plays there with the pub lights down and a spotlight on him. A 0.30 m
+# platform of boards on a mahogany skirt with a brass nosing, its south-east
+# corner cut on the diagonal to face the room and a step along the cut; red
+# velvet drapes on the three walls round it under a gold-fringed pelmet;
+# footlights along the front; a theatre spotlight hung from the ceiling out over
+# the floor (the beam is the café prop rig's, the light is Light_G in the
+# client). His prop table (a knife block) and the bubble bucket stand at the back.
 M_RV_CURTAIN = mk('RoversStageDrape', '6A0C16', 0.95)
 M_RV_FRINGE = mk('RoversStageFringe', 'C9A24A', 0.55, 0.3)
 M_RV_STGLOW = mk('RoversStageLamp', 'FFF2D8', 0.4)
@@ -3749,42 +3749,58 @@ _sgb.inputs['Emission Strength'].default_value = 3.0
 M_RV_BUCKET = mk('RoversStageBucket', 'A3A8AE', 0.35, 0.5)
 M_RV_SOAP = mk('RoversStageSoap', 'D8ECF2', 0.15)
 _sp = RVF.STAGE_POLY
+_st = RVF.STAGE_STEP
 rv_prism("RvStageSkirt", _sp, RV_FZ - 0.01, RVF.STAGE_TOP - 0.03, M_RV_MAHOG, 0.6)
 rv_prism("RvStageBoards", _sp, RVF.STAGE_TOP - 0.03, RVF.STAGE_TOP, M_RV_BOARDS, 1.0)
-rv_prism("RvStageStep", RVF.STAGE_STEP, RV_FZ - 0.01, RVF.STEP_TOP, M_RV_MAHOG, 0.6)
-# Brass nosing round the open edges (east, the cut, south) and on the step.
-for k, (a, b) in enumerate(((_sp[1], _sp[2]), (_sp[2], _sp[3]), (_sp[3], _sp[4]),
-                            (RVF.STAGE_STEP[3], RVF.STAGE_STEP[2]))):
-    z = RVF.STEP_TOP if k == 3 else RVF.STAGE_TOP
+rv_prism("RvStageStep", _st, RV_FZ - 0.01, RVF.STEP_TOP, M_RV_MAHOG, 0.6)
+# Brass nosing round the open edges (the cut, the front, the corner by the
+# Gents door, the west end) and along the step.
+for k, (a, b) in enumerate([(_sp[i], _sp[i + 1]) for i in range(2, len(_sp) - 1)] + [(_st[3], _st[2])]):
+    z = RVF.STEP_TOP if k == len(_sp) - 3 else RVF.STAGE_TOP
     L = math.hypot(b[0] - a[0], b[1] - a[1])
     yaw = math.atan2(b[1] - a[1], b[0] - a[0])
     rv_rbox(f"RvStageNosing{k}", ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2), yaw, -L / 2, L / 2, -0.012, 0.012,
             z - 0.035, z + 0.004, M_RV_BRASS)
-# Drapes: a backing sheet on each wall and pleats in front of it.
-rv_box("RvStageDrapeN", RV_IX1, _sp[1][0], RV_IY2 - 0.035, RV_IY2 - 0.005, RVF.STAGE_TOP, 2.70, M_RV_CURTAIN)
-rv_box("RvStageDrapeW", RV_IX1 + 0.005, RV_IX1 + 0.035, _sp[4][1], RV_IY2, RVF.STAGE_TOP, 2.70, M_RV_CURTAIN)
+# Drapes: a backing sheet on each wall (the front windows, the party wall, the
+# lobby's side wall) and pleats in front of it.
+_xe = RVF.LOBBY_WALL_X
+_ye = _sp[2][1]                                    # (where the stage leaves the lobby wall)
+rv_box("RvStageDrapeN", RV_IX1, _xe, RV_IY2 - 0.035, RV_IY2 - 0.005, RVF.STAGE_TOP, 2.70, M_RV_CURTAIN)
+rv_box("RvStageDrapeW", RV_IX1 + 0.005, RV_IX1 + 0.035, _sp[-1][1], RV_IY2, RVF.STAGE_TOP, 2.70, M_RV_CURTAIN)
+rv_box("RvStageDrapeE", _xe - 0.035, _xe - 0.005, _ye, RV_IY2, RVF.STAGE_TOP, 2.70, M_RV_CURTAIN)
 _x = RV_IX1 + 0.10
 k = 0
-while _x < _sp[1][0] - 0.04:
+while _x < _xe - 0.08:
     rv_cyl(f"RvStagePleatN{k}", _x, RV_IY2 - 0.05, (RVF.STAGE_TOP + 2.70) / 2, 0.045, 2.70 - RVF.STAGE_TOP,
            M_RV_CURTAIN, verts=8)
     _x += 0.11
     k += 1
-_y = _sp[4][1] + 0.06
+_y = _sp[-1][1] + 0.06
 k = 0
 while _y < RV_IY2 - 0.10:
     rv_cyl(f"RvStagePleatW{k}", RV_IX1 + 0.05, _y, (RVF.STAGE_TOP + 2.70) / 2, 0.045, 2.70 - RVF.STAGE_TOP,
            M_RV_CURTAIN, verts=8)
     _y += 0.11
     k += 1
-# Pelmet with a gold fringe over both drapes.
-rv_box("RvStagePelmetN", RV_IX1, _sp[1][0] + 0.06, RV_IY2 - 0.16, RV_IY2, 2.70, 2.98, M_RV_CURTAIN)
-rv_box("RvStagePelmetW", RV_IX1, RV_IX1 + 0.16, _sp[4][1] - 0.06, RV_IY2, 2.70, 2.98, M_RV_CURTAIN)
-rv_box("RvStageFringeN", RV_IX1, _sp[1][0] + 0.06, RV_IY2 - 0.165, RV_IY2 - 0.155, 2.64, 2.72, M_RV_FRINGE)
-rv_box("RvStageFringeW", RV_IX1 + 0.155, RV_IX1 + 0.165, _sp[4][1] - 0.06, RV_IY2 - 0.16, 2.64, 2.72, M_RV_FRINGE)
-# Footlights: little brass hoods with a glowing bulb, along the cut and the east edge.
-_feet = [(_sp[2][0] + (_sp[3][0] - _sp[2][0]) * u, _sp[2][1] + (_sp[3][1] - _sp[2][1]) * u) for u in (0.25, 0.75)]   # (he steps up between them)
-_feet += [(_sp[1][0] - 0.05, -10.30), (_sp[1][0] - 0.05, -10.52), (-3.20, _sp[4][1] + 0.05), (-3.55, _sp[4][1] + 0.05)]
+_y = _ye + 0.06
+k = 0
+while _y < RV_IY2 - 0.10:
+    rv_cyl(f"RvStagePleatE{k}", _xe - 0.05, _y, (RVF.STAGE_TOP + 2.70) / 2, 0.045, 2.70 - RVF.STAGE_TOP,
+           M_RV_CURTAIN, verts=8)
+    _y += 0.11
+    k += 1
+# Pelmet with a gold fringe over the three drapes.
+rv_box("RvStagePelmetN", RV_IX1, _xe, RV_IY2 - 0.16, RV_IY2, 2.70, 2.98, M_RV_CURTAIN)
+rv_box("RvStagePelmetW", RV_IX1, RV_IX1 + 0.16, _sp[-1][1] - 0.06, RV_IY2, 2.70, 2.98, M_RV_CURTAIN)
+rv_box("RvStagePelmetE", _xe - 0.16, _xe, _ye - 0.06, RV_IY2, 2.70, 2.98, M_RV_CURTAIN)
+rv_box("RvStageFringeN", RV_IX1 + 0.16, _xe - 0.16, RV_IY2 - 0.165, RV_IY2 - 0.155, 2.64, 2.72, M_RV_FRINGE)
+rv_box("RvStageFringeW", RV_IX1 + 0.155, RV_IX1 + 0.165, _sp[-1][1] - 0.06, RV_IY2 - 0.16, 2.64, 2.72, M_RV_FRINGE)
+rv_box("RvStageFringeE", _xe - 0.165, _xe - 0.155, _ye - 0.06, RV_IY2 - 0.16, 2.64, 2.72, M_RV_FRINGE)
+# Footlights: little brass hoods with a glowing bulb along the front, and at
+# the two ends of the cut (he steps up between them).
+_feet = [(_sp[2][0] + (_sp[3][0] - _sp[2][0]) * u, _sp[2][1] + (_sp[3][1] - _sp[2][1]) * u) for u in (0.12, 0.88)]
+_feet = [(x - 0.04, y + 0.04) for x, y in _feet]
+_feet += [(x, _sp[3][1] + 0.05) for x in (-2.35, -2.65, -2.95)] + [(-3.55, _sp[-1][1] + 0.05)]
 for k, (x, y) in enumerate(_feet):
     rv_cyl(f"RvStageFootHood{k}", x, y, RVF.STAGE_TOP + 0.025, 0.035, 0.05, M_RV_BRASS, verts=8)
     bpy.ops.mesh.primitive_uv_sphere_add(segments=8, ring_count=4, radius=0.022,
@@ -3805,6 +3821,22 @@ rv_cyl("RvStageBucket", _bx, _by, (RVF.STAGE_TOP + RVF.BUCKET_TOP) / 2, 0.12, RV
        M_RV_BUCKET, verts=14)
 rv_cyl("RvStageBucketRim", _bx, _by, RVF.BUCKET_TOP - 0.006, 0.126, 0.012, M_RV_BUCKET, verts=14)
 rv_cyl("RvStageSoap", _bx, _by, RVF.BUCKET_TOP - 0.04, 0.112, 0.004, M_RV_SOAP, verts=14)
+# His steamer trunk (each night's kit lives in it): dark green canvas over
+# wood, brass corners and two leather straps.
+M_RV_TRUNK = mk('RoversStageTrunk', '2E4A3A', 0.7)
+_tx2, _ty2 = RVF.TRUNK
+_tw, _td, _th = RVF.TRUNK_SIZE
+rv_box("RvStageTrunk", _tx2 - _tw / 2, _tx2 + _tw / 2, _ty2 - _td / 2, _ty2 + _td / 2, RVF.STAGE_TOP, RVF.TRUNK_TOP,
+       M_RV_TRUNK)
+for _sx in (-1, 1):
+    for _sy in (-1, 1):
+        rv_box(f"RvStageTrunkCorner{_sx}{_sy}", _tx2 + _sx * _tw / 2 - (0.05 if _sx > 0 else 0), _tx2 + _sx * _tw / 2 +
+               (0.005 if _sx > 0 else 0.05), _ty2 + _sy * _td / 2 - (0.05 if _sy > 0 else 0),
+               _ty2 + _sy * _td / 2 + (0.005 if _sy > 0 else 0.05), RVF.TRUNK_TOP - 0.06, RVF.TRUNK_TOP + 0.005,
+               M_RV_BRASS)
+for _k, _dx in enumerate((-0.2, 0.2)):
+    rv_box(f"RvStageTrunkStrap{_k}", _tx2 + _dx - 0.025, _tx2 + _dx + 0.025, _ty2 - _td / 2 - 0.006,
+           _ty2 + _td / 2 + 0.006, RVF.STAGE_TOP + 0.02, RVF.TRUNK_TOP + 0.006, M_RV_BLACK)
 # The spotlight: a black lantern on a yoke from the ceiling, aimed at his spot.
 _L = RVF.SPOT_LAMP
 _aim = Vector((RVF.MIME_PUB[0], RVF.MIME_PUB[1], RVF.STAGE_TOP + 1.2)) - _L
@@ -3813,21 +3845,12 @@ rv_cyl("RvStageSpotBody", *(_L - _aim.normalized() * 0.20), 0.09, 0.34, M_RV_BLA
 rv_cyl("RvStageSpotLens", *(_L - _aim.normalized() * 0.025), 0.075, 0.02, M_RV_STGLOW, verts=12, rot=tuple(_rot))
 rv_cyl("RvStageSpotRod", _L.x, _L.y, (_L.z + RV_CZ) / 2 + 0.06, 0.012, RV_CZ - _L.z - 0.10, M_RV_BLACK, verts=6)
 
-# --- The café couple's table, front row (cafe_figures: they come over from the
-# café after the dinner party moves into the Rovers) ------------------------
-M_RV_CHAIR = mk('RoversChairWood', '3A1C10', 0.55)
-_cx, _cy = RVF.CAB_TABLE
-rv_cyl("RvFurnCabTop", _cx, _cy, RVF.CAB_TOP - 0.015, 0.26, 0.03, M_RV_COPPER, verts=16)
-rv_cyl("RvFurnCabStem", _cx, _cy, (RV_FZ + RVF.CAB_TOP) / 2, 0.035, RVF.CAB_TOP - RV_FZ - 0.03, M_RV_IRON, verts=8)
-rv_cyl("RvFurnCabFoot", _cx, _cy, RV_FZ + 0.02, 0.19, 0.04, M_RV_IRON, verts=12)
-for who, (x, y) in RVF.CAB_CHAIRS.items():
-    yaw = math.radians(RVF.CAB_YAW[who])
-    s = RVF.CAB_SEAT
-    rv_rbox(f"RvFurnCabSeat{who}", (x, y), yaw, -0.20, 0.20, -0.20, 0.20, s - 0.06, s, M_RV_VELOUR, 0.4)
-    for lx, ly in ((-0.17, -0.17), (0.17, -0.17), (-0.17, 0.17), (0.17, 0.17)):
-        rv_rbox(f"RvFurnCabLeg{who}{lx:+.0f}{ly:+.0f}", local_pt((x, y), yaw, lx, ly), yaw, -0.017, 0.017,
-                -0.017, 0.017, RV_FZ, s - 0.06, M_RV_CHAIR)
-    rv_rbox(f"RvFurnCabBack{who}", (x, y), yaw, -0.19, 0.19, -0.21, -0.18, s, s + 0.42, M_RV_CHAIR)
+# --- Jay's table: where his and his guest's glasses stand (the client makes
+# glasses there they can pick up and drink from; rovers_figures JAY_GLASSES).
+for kind, (x, y) in RVF.JAY_GLASSES.items():
+    e = bpy.data.objects.new(f"LoungeDrink_{kind}", None)
+    e.location = (x, y, RVF.TABLE_Z)
+    sc.collection.objects.link(e)
 
 # --- Darts at the rear of the right-hand wall, piano, boards, pendants -------
 # Moved 0.45 m east of the piano stool so the throwing lane clears the pianist
@@ -3924,13 +3947,14 @@ RV_SEATS = (
     [(f"Seat_RovA{k + 1}", x, y, 0.55, 0) for k, (x, y) in enumerate(BANQ_A + BANQ_B)] +
     [(f"Seat_RovSnug{k + 1}", x - 0.02, y, 0.55, -90) for k, (x, y) in enumerate(BANQ_E)] +
     [(f"Seat_RovBar{k + 1}", x, y, RV_FZ + 0.75, 0) for k, (x, y) in enumerate(BAR_STOOLS)] +
-    [(f"Seat_RovTA{k + 1}", x, -11.78, RV_FZ + 0.46, 180) for k, (x, y) in enumerate(TABLES_A)] +
+    [(f"Seat_RovTA{k + 1}", x, -11.78, RV_FZ + 0.46, 180) for k, (x, y) in enumerate(TABLES_A_STOOL)] +
     [(f"Seat_RovTE{k + 1}", 4.65, y, RV_FZ + 0.46, 90) for k, (x, y) in enumerate(TABLES_E)] +
     [(f"Seat_RovRoof{k + 1}", x, y - 0.02, RV_DECK + 0.42, 0) for k, (x, y) in enumerate(RV_ROOF_CHAIRS)])
 # Taken by the animated regulars (rovers_figures.py): three bar stools, the
-# first booth cushion and the stool opposite it.
-RV_TAKEN = {"Seat_RovBar1", "Seat_RovBar2", "Seat_RovBar3", "Seat_RovBar4", "Seat_RovA1", "Seat_RovTA1",
-            "Seat_RovBar5"}
+# booth cushions and stools of the blonde lady's table, the café couple's and
+# the couple's beside Jay's. Jay's (Seat_RovA3, Seat_RovTA3) are left free.
+RV_TAKEN = {"Seat_RovBar1", "Seat_RovBar2", "Seat_RovBar3", "Seat_RovBar4", "Seat_RovBar5",
+            "Seat_RovA1", "Seat_RovTA1", "Seat_RovA2", "Seat_RovTA2", "Seat_RovA4"}
 # After dinner the snug is the dinner party's (dinner_figures.py PUB_SEAT).
 RV_TAKEN |= {f"Seat_RovSnug{k + 1}" for k in range(4)} | {"Seat_RovTE1", "Seat_RovTE2"}
 RV_SEATS = tuple(s for s in RV_SEATS if s[0] not in RV_TAKEN)
@@ -4795,6 +4819,8 @@ print(f"DETAIL faces: {_counts}")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 if os.environ.get('LOUNGE_PREFIG_BLEND'):   # debug checkpoint: iterate the figure gates on real geometry
     bpy.ops.wm.save_as_mainfile(filepath=os.environ['LOUNGE_PREFIG_BLEND'], copy=True)
+    if os.environ.get('LOUNGE_PREFIG_ONLY'):
+        sys.exit(0)
 import rovers_figures
 rovers_figures.build()
 # Dinner party in the dining room (dinner_figures.py): six guests, two waiters

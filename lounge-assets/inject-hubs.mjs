@@ -56,6 +56,13 @@ json.extensionsUsed = [...new Set([...(json.extensionsUsed || []), "MOZ_hubs_com
 json.extensions = { ...(json.extensions || {}), MOZ_hubs_components: { version: 4 } };
 const counts = { nav: 0, spawn: 0, seat: 0, light: 0, ambient: 0, mirror: 0, figures: 0 };
 const animNames = new Set((json.animations || []).map(a => a.name));
+// The mime and his prop rig (cafe_figures.py NIGHTS) have a finale clip for
+// every night of the week: the dinner clip up to the finale, that night's
+// finale, then the lounge loop; the client picks the night (loop-animation
+// "nights": the first variant's index and how many).
+const NIGHTS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const hasNights = n => animNames.has(`${n}FinMon`);
+const nightClips = n => NIGHTS.map(d => `${n}Fin${d}`);
 function regularSeq(n) {
   const show = animNames.has(`${n}Show`), after = animNames.has(`${n}After`);
   if (!show && !after) return null;
@@ -109,7 +116,12 @@ for (const node of json.nodes || []) {
     // clip (the rest of the night, nobody watching) plays its clips in session
     // order too: the loop until the finale, the show over it, then after.
     const seq = regularSeq(n);
-    comps = /^Fig_Din/.test(n)
+    comps = /^Fig_Din/.test(n) && hasNights(n)
+      ? { "loop-animation": { clip: [`${n}Dinner`, ...nightClips(n), `${n}Lounge`].join(","),
+                              cues: [DINNER_META.finale, DINNER_META.dinner].join(","), nights: `1,${NIGHTS.length}`,
+                              paused: false, serverClock: true, session: true, phase: DINNER_META.phase },
+          frustrum: { culled: false } }
+      : /^Fig_Din/.test(n)
       ? { "loop-animation": { clip: `${n}Dinner,${n}Lounge`, paused: false, serverClock: true, session: true,
                               phase: DINNER_META.phase },
           frustrum: { culled: false } }
@@ -142,7 +154,8 @@ const clipLen = name => {
   const a = anims.find(an => an.name === name);
   return a && Math.max(...a.samplers.map(sm => json.accessors[sm.input].max[0]));
 };
-const clipsOf = name => (/^Fig_Din/.test(name) ? [`${name}Dinner`, `${name}Lounge`]
+const clipsOf = name => (/^Fig_Din/.test(name)
+  ? [`${name}Dinner`, ...(hasNights(name) ? nightClips(name) : []), `${name}Lounge`]
   : [`${name}Loop`, ...[`${name}Show`, `${name}After`].filter(c => animNames.has(c))]);
 let clipCount = 0;
 for (const nd of figNodes) {
@@ -162,7 +175,18 @@ for (const nd of figNodes.filter(nd => /^Fig_Din/.test(nd.name))) {
     if (Math.abs(r - Math.round(r)) > 1e-3) throw new Error(`${c} is ${len}s, not whole phases of ${DINNER_META.phase}s`);
   }
   if (DINNER_META.at + DINNER_META.len > clipLen(`${nd.name}Dinner`) - 1) throw new Error("linger window past the dinner clip");
-  if (Math.abs(clipLen(`${nd.name}Dinner`) - DINNER_META.dinner) > 1e-3) throw new Error(`${nd.name}Dinner is not the dinner meta length`);
+  if (hasNights(nd.name)) {
+    // (the dinner clip up to the finale, then a whole finale every night)
+    if (Math.abs(clipLen(`${nd.name}Dinner`) - DINNER_META.finale) > 1e-3) throw new Error(`${nd.name}Dinner does not stop at the finale`);
+    for (const c of nightClips(nd.name)) {
+      if (Math.abs(clipLen(c) - (DINNER_META.dinner - DINNER_META.finale)) > 1e-3) throw new Error(`${c} is not the finale's length`);
+    }
+  } else if (Math.abs(clipLen(`${nd.name}Dinner`) - DINNER_META.dinner) > 1e-3) throw new Error(`${nd.name}Dinner is not the dinner meta length`);
+}
+const nightly = figNodes.filter(nd => hasNights(nd.name)).map(nd => nd.name);
+console.log(`nights: ${nightly.join(", ")} with ${NIGHTS.length} finales each`);
+if (nightly.length !== 2 || !nightly.includes("Fig_DinMime") || !nightly.includes("Fig_DinCafeProps")) {
+  throw new Error(`expected the mime and his prop rig to have nightly finales, got ${nightly}`);
 }
 // The finale: every Show clip spans it exactly, every Show/After clip is a
 // whole number of phases, and it ends where the dinner clip does.
